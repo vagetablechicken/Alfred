@@ -1,0 +1,16 @@
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+norecursedirs = [
+    "*.egg-info",
+    ".git",
+    ".mypy_cache",
+    "node_modules",
+    ".pytest_cache",
+    ".vscode",
+]
+python_files = ["test_*.py", "bench_*.py"]
+python_functions = ["test_*", "bench_*"]
+log_cli = true
+log_cli_level = "INFO"

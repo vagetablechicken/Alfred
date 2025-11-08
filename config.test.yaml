@@ -1,0 +1,11 @@
+# Alfred 测试环境配置
+vault:
+  path: "test.db"  # 使用测试数据库文件
+
+logging:
+  level: "DEBUG"
+
+# better to set before tests?
+# scheduler:
+#   interval_seconds: 1
+#   escalator_interval_seconds: 1

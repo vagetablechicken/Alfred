@@ -1,0 +1,14 @@
+# Alfred production environment configuration
+vault:
+  path: "prod.db" # Database file path (relative to project root)
+  init_sql: "" # if empty, use default init sql
+
+logging:
+  level: "INFO"
+
+scheduler:
+  interval_seconds: 60
+  escalator_interval_seconds: 300
+
+slack:
+  channel: "C09RC3VSA94"  # test-channel
