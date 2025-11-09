@@ -12,7 +12,7 @@ websocket模式，只需要运行App，不需要公网IP来接收slack的event�
 # linux or macOS
 export SLACK_BOT_TOKEN="xoxb-your-slack-bot-token"
 export SLACK_APP_TOKEN="xapp-your-slack-app-token"
-python app.py
+python -m src.alfred
 ```
 
 ```powershell

@@ -1,6 +1,9 @@
 from datetime import datetime
-from app import app
-from task.task_engine import task_engine
+
+from ..app import app
+from ...task.task_engine import task_engine
+from ...utils.readable import gen_todo_desc
+
 
 @app.action("log_todo_button")
 def handle_log_todo_button(ack, body, client, logger):
@@ -34,7 +37,7 @@ def handle_log_todo_button(ack, body, client, logger):
         section_block_id = action_block_id.replace("_actions", "_section")
 
         # generate from task id, more clear
-        task_text = 
+        task_text = gen_todo_desc(task_engine, todo_id)
 
         completed_blocks = [
             {

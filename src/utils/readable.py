@@ -1,8 +1,8 @@
-def readable_todo_desc(task_engine, todo_id):
+def gen_todo_desc(task_engine, todo_id):
     """
     Generate formatted markdown text for a todo item given its ID.
     """
-    todo = task_engine.get_todo_by_id(todo_id)
+    todo = task_engine.get_todo(todo_id)
     if not todo:
         return f"No TODO found with ID {todo_id}."
 

@@ -1,7 +1,6 @@
-# slack-sdk
-flask
-# python-dotenv
-croniter
 slack_bolt
+aiohttp
+flask
+croniter
 
 pytest

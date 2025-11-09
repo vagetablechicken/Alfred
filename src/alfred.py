@@ -2,9 +2,16 @@ import os
 import logging
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from slack.app import app
-from extra.flask_app import flask_app
-from utils.logger_config import setup_global_logger
+from .utils.logger_config import setup_global_logger
+from .slack.app import app
+
+# register
+from .slack import listeners  # noqa: F401
+from .extra.flask_app import flask_app
+
+# for dev, bind slack events to flask app
+from .extra import dev  # noqa: F401
+
 
 if __name__ == "__main__":
     assert os.environ.get("SLACK_APP_TOKEN") is not None, "SLACK_APP_TOKEN is required!"

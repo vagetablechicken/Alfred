@@ -1,4 +1,4 @@
-from app import app
+from ..app import app
 
 # I don't care about normal messages, you can remove the event subscription if you want
 # Just a protective handler

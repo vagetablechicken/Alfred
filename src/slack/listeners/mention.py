@@ -1,6 +1,6 @@
 from datetime import datetime
-from app import app
-from task.task_engine import task_engine
+from ..app import app
+from ...task.task_engine import task_engine
 
 
 @app.event("app_mention")

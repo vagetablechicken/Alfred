@@ -1,6 +1,6 @@
 import logging
-from app import app
-from task.task_engine import task_engine
+from ..app import app
+from ...task.task_engine import task_engine
 
 
 @app.command("/alfred")

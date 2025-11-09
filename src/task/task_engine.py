@@ -436,6 +436,33 @@ class TaskEngine:
             print(f"ERROR querying todos: {e}")
             return []
 
+    def get_todo(self, todo_id: int):
+        """辅助函数：获取单个 todo 详情"""
+        try:
+            with self.db as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    """
+                    SELECT 
+                        td.id, 
+                        t.task_name, 
+                        td.user_id, 
+                        td.status, 
+                        td.reminder_time, 
+                        td.ddl_time
+                    FROM todos td
+                    JOIN task_templates t ON td.template_id = t.template_id
+                    WHERE td.id = ?
+                    """,
+                    (todo_id,),
+                )
+                result = cur.fetchone()
+                return result
+
+        except sqlite3.Error as e:
+            print(f"ERROR querying todo {todo_id}: {e}")
+            return None
+
 
 # 全局引擎实例
 db_manager = DatabaseManager("tasks.db")

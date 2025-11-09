@@ -1,4 +1,4 @@
-from task.task_engine import task_engine
+from ..task.task_engine import task_engine
 
 from flask import Flask, make_response
 
