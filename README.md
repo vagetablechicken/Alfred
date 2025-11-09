@@ -26,6 +26,10 @@ python app.py
 
 
 测试
-```bash
+mock request，不用和slack通信。
+
+
+slack命令行测试，检查权限，交互是否正确等：
+```
 /alfred test
 ```

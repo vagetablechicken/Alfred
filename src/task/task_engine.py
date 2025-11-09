@@ -1,67 +1,16 @@
-import sqlite3
-import datetime
-from datetime import timedelta
 from croniter import croniter
-import os
-import sys
+import datetime
+import sqlite3
+from datetime import timedelta
+import logging
+
+from .database.database_manager import DatabaseManager
 
 
-# ------------------------------------------------------------------
-# 1. 数据库管理类 (从 init.sql 读取)
-# ------------------------------------------------------------------
-class DatabaseManager:
-    """
-    一个简单的 SQLite 数据库连接和操作封装。
-    - 自动处理连接的打开/关闭。
-    - 自动启用外键 (PRAGMA foreign_keys = ON)。
-    """
-
-    def __init__(self, db_file):
-        self.db_file = db_file
-        self.conn = None
-
-    def __enter__(self):
-        self.conn = sqlite3.connect(self.db_file)
-        # 关键: 必须在每次连接时都执行
-        self.conn.execute("PRAGMA foreign_keys = ON;")
-        return self.conn
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.conn:
-            self.conn.close()
-
-    def create_tables(self, init_sql_file="init.sql"):
-        """
-        执行初始化 SQL 脚本来创建所有表。
-        假设 'init.sql' 脚本中不包含 'COMMIT;'。
-        """
-        print(f"Initializing database tables from '{init_sql_file}'...")
-        try:
-            with open(init_sql_file, "r", encoding="utf-8") as f:
-                sql_script = f.read()
-
-            # (1) 使用 __enter__ 获取连接 (已开启 foreign_keys)
-            with self as conn:
-                # (2) executescript 会自动处理 DDL 事务
-                conn.executescript(sql_script)
-
-            print("Database and tables initialized successfully.")
-            return True
-
-        except FileNotFoundError:
-            print(f"ERROR: '{init_sql_file}' not found. Tables were not created.")
-            return False
-        except sqlite3.Error as e:
-            print(f"ERROR during table initialization: {e}")
-            return False
-
-
-# ------------------------------------------------------------------
-# 2. 核心业务逻辑引擎 (与上一版相同)
-# ------------------------------------------------------------------
 class TaskEngine:
     def __init__(self, db_manager):
         self.db = db_manager
+        self.logger = logging.getLogger(__name__)
 
     def _parse_bias(self, bias_str: str) -> timedelta:
         """简单的 ddl_bias 解析器 (例如 '1h', '30m', '2d')"""
@@ -118,12 +67,12 @@ class TaskEngine:
         )
         return todo_id
 
-    def run_scheduler(self, simulation_time: datetime.datetime):
+    def run_scheduler(self, current_time: datetime.datetime):
         """
         (幂等调度器)
         运行调度器，为所有“上一个应执行”但尚未创建的任务创建实例。
         """
-        print(f"\n--- [SCHEDULER] running at {simulation_time} ---")
+        self.logger.info(f"\n--- [SCHEDULER] running at {current_time} ---")
 
         created_count = 0
         try:
@@ -150,7 +99,7 @@ class TaskEngine:
                 ) in active_templates:
                     try:
                         # 2. 获取“上一个”应执行的时间点
-                        cron_iter = croniter(cron, simulation_time)
+                        cron_iter = croniter(cron, current_time)
                         last_due_time = cron_iter.get_prev(datetime.datetime)
 
                         # 3. “判断”是否已存在
@@ -166,7 +115,7 @@ class TaskEngine:
                             continue  # 已存在, 跳过
 
                         # 4. 不存在, 在事务中创建
-                        print(
+                        self.logger.info(
                             f"[Scheduler] CREATING: Task for {user_id} ({task_name}) at {last_due_time}"
                         )
                         with conn:  # 使用 'with conn' 自动管理 commit/rollback
@@ -176,12 +125,12 @@ class TaskEngine:
                                 template_id,
                                 ddl_bias,
                                 reminder_time=last_due_time,
-                                sim_time=simulation_time,
+                                sim_time=current_time,
                             )
                         created_count += 1
                         if run_once:
                             # 如果是“只运行一次”，则禁用模板，之后再设置is_active=1的话，还可以再进行“只运行一次”
-                            print(
+                            self.logger.info(
                                 f"[Scheduler] Disabling one-time template {template_id} for {user_id}"
                             )
                             cur.execute(
@@ -192,24 +141,24 @@ class TaskEngine:
                             )
 
                     except Exception as e:
-                        print(
+                        self.logger.error(
                             f"[Scheduler] ERROR processing {user_id} / {task_name}: {e}"
                         )
 
             if created_count == 0:
-                print("[Scheduler] No new tasks to schedule at this time.")
+                self.logger.info("[Scheduler] No new tasks to schedule at this time.")
             else:
-                print(f"[Scheduler] Created {created_count} new tasks.")
+                self.logger.info(f"[Scheduler] Created {created_count} new tasks.")
 
         except sqlite3.Error as e:
-            print(f"[Scheduler] DB ERROR: {e}")
+            self.logger.error(f"[Scheduler] DB ERROR: {e}")
 
     def run_escalation(self, simulation_time: datetime.datetime):
         """
         (升级器)
         检查并升级已过期的 'pending' 任务
         """
-        print(f"\n--- [ESCALATOR] running at {simulation_time} ---")
+        self.logger.info(f"\n--- [ESCALATOR] running at {simulation_time} ---")
 
         escalated_count = 0
         try:
@@ -227,7 +176,7 @@ class TaskEngine:
                 tasks_to_escalate = cur.fetchall()
 
                 if not tasks_to_escalate:
-                    print("[Escalator] No tasks to escalate.")
+                    self.logger.info("[Escalator] No tasks to escalate.")
                     return
 
                 for (todo_id,) in tasks_to_escalate:
@@ -252,19 +201,21 @@ class TaskEngine:
                                 (todo_id, simulation_time.isoformat()),
                             )
 
-                        print(f"[Escalator] ESCALATED Todo {todo_id}")
+                        self.logger.info(f"[Escalator] ESCALATED Todo {todo_id}")
                         escalated_count += 1
                     except sqlite3.Error as e:
-                        print(f"[Escalator] ERROR escalating Todo {todo_id}: {e}")
+                        self.logger.error(
+                            f"[Escalator] ERROR escalating Todo {todo_id}: {e}"
+                        )
 
-            print(f"[Escalator] Escalated {escalated_count} tasks.")
+            self.logger.info(f"[Escalator] Escalated {escalated_count} tasks.")
 
         except sqlite3.Error as e:
-            print(f"[Escalator] DB ERROR: {e}")
+            self.logger.error(f"[Escalator] DB ERROR: {e}")
 
     def complete_task(self, todo_id: int, sim_time: datetime.datetime):
         """(用户操作) 完成任务"""
-        print(f"\n--- [USER] Completing Todo {todo_id} at {sim_time} ---")
+        self.logger.info(f"\n--- [USER] Completing Todo {todo_id} at {sim_time} ---")
         try:
             with self.db as conn:
                 with conn:  # 自动事务
@@ -273,12 +224,12 @@ class TaskEngine:
                     result = cur.fetchone()
 
                     if not result:
-                        print(f"ERROR: Todo {todo_id} not found.")
+                        self.logger.error(f"ERROR: Todo {todo_id} not found.")
                         return
 
                     old_status = result[0]
                     if old_status in ("completed", "revoked"):
-                        print(
+                        self.logger.info(
                             f"Todo {todo_id} is already in a final state ({old_status})."
                         )
                         return
@@ -291,13 +242,13 @@ class TaskEngine:
                         "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, ?, 'completed', ?)",
                         (todo_id, old_status, sim_time.isoformat()),
                     )
-                print(f"COMPLETED Todo {todo_id} (was {old_status})")
+                self.logger.info(f"COMPLETED Todo {todo_id} (was {old_status})")
         except sqlite3.Error as e:
-            print(f"ERROR completing Todo {todo_id}: {e}")
+            self.logger.error(f"ERROR completing Todo {todo_id}: {e}")
 
     def revert_task_completion(self, todo_id: int, sim_time: datetime.datetime):
         """(用户操作) 撤销完成 (错点了)"""
-        print(f"\n--- [USER] Reverting Todo {todo_id} at {sim_time} ---")
+        self.logger.info(f"\n--- [USER] Reverting Todo {todo_id} at {sim_time} ---")
         try:
             with self.db as conn:
                 with conn:
@@ -308,12 +259,12 @@ class TaskEngine:
                     result = cur.fetchone()
 
                     if not result:
-                        print(f"ERROR: Todo {todo_id} not found.")
+                        self.logger.error(f"ERROR: Todo {todo_id} not found.")
                         return
                     old_status, ddl_time_str = result
 
                     if old_status != "completed":
-                        print(
+                        self.logger.error(
                             f"ERROR: Todo {todo_id} is not 'completed'. Cannot revert."
                         )
                         return
@@ -330,18 +281,20 @@ class TaskEngine:
                         "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, 'completed', ?, ?)",
                         (todo_id, new_status, sim_time.isoformat()),
                     )
-                print(
+                self.logger.info(
                     f"REVERTED Todo {todo_id} from 'completed' back to '{new_status}'"
                 )
         except sqlite3.Error as e:
-            print(f"ERROR reverting Todo {todo_id}: {e}")
+            self.logger.error(f"ERROR reverting Todo {todo_id}: {e}")
 
     def set_template_active_status(
         self, template_id: int, is_active: bool, sim_time: datetime.datetime
     ):
         """(管理员操作) 禁用或启用模板，并作废相关任务"""
         status_str = "Activating" if is_active else "Deactivating"
-        print(f"\n--- [ADMIN] {status_str} Template {template_id} at {sim_time} ---")
+        self.logger.info(
+            f"\n--- [ADMIN] {status_str} Template {template_id} at {sim_time} ---"
+        )
 
         try:
             with self.db as conn:
@@ -368,10 +321,12 @@ class TaskEngine:
 
                         tasks_to_revoke = cur.fetchall()
                         if not tasks_to_revoke:
-                            print("No active todos to revoke.")
+                            self.logger.info("No active todos to revoke.")
 
                         for todo_id, old_status in tasks_to_revoke:
-                            print(f"REVOKING Todo {todo_id} (was {old_status})...")
+                            self.logger.info(
+                                f"REVOKING Todo {todo_id} (was {old_status})..."
+                            )
                             # (a) 更新 todos
                             cur.execute(
                                 """
@@ -390,18 +345,20 @@ class TaskEngine:
                                 (todo_id, old_status, sim_time.isoformat()),
                             )
 
-                print(
+                self.logger.info(
                     f"Successfully set Template {template_id} active status to {is_active}"
                 )
                 if not is_active and tasks_to_revoke:
-                    print(f"Revoked {len(tasks_to_revoke)} associated tasks.")
+                    self.logger.info(
+                        f"Revoked {len(tasks_to_revoke)} associated tasks."
+                    )
 
         except sqlite3.Error as e:
-            print(f"ERROR changing template status: {e}")
+            self.logger.error(f"ERROR changing template status: {e}")
 
     # --- 辅助函数 ---
     def add_template(self, user_id, name, cron, bias, run_once=0):
-        print(f"\nAdding template for {user_id}: {name}")
+        self.logger.info(f"\nAdding template for {user_id}: {name}")
         with self.db as conn:
             with conn:
                 cur = conn.cursor()
@@ -480,103 +437,6 @@ class TaskEngine:
             return []
 
 
-# ------------------------------------------------------------------
-# 3. 运行演示
-# ------------------------------------------------------------------
-if __name__ == "__main__":
-
-    DB_FILE = "tasks_demo.db"
-    INIT_FILE = "init.sql"
-
-    # --- 1. (重置) ---
-    if not os.path.exists(INIT_FILE):
-        print(f"ERROR: '{INIT_FILE}' not found. Please create it first.")
-        print("This script will now exit.")
-        sys.exit(1)  # 退出脚本
-
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-        print(f"Removed old {DB_FILE}")
-
-    # --- 2. 初始化 ---
-    dbm = DatabaseManager(DB_FILE)
-    engine = TaskEngine(dbm)
-
-    # create_tables 会读取 init.sql
-    if not dbm.create_tables(init_sql_file=INIT_FILE):
-        print("Failed to initialize database. Exiting.")
-        sys.exit(1)
-
-    # --- 3. 创建模板 (计划) ---
-    # (为了演示，我们使用每分钟的 cron)
-    # 真实世界中, cron 应该是 "0 9 * * *"
-
-    # Alice: 每分钟提醒, 5分钟后过期
-    template_alice_id = engine.add_template("Alice", "每分钟打卡", "* * * * *", "5m")
-    # Bob: 每分钟提醒, 2分钟后过期
-    template_bob_id = engine.add_template("Bob", "每分钟喝水", "* * * * *", "2m")
-
-    engine.print_table_status()
-
-    # --- 4. 模拟时间流逝 ---
-
-    # T=1. 模拟 10:00:05 (调度器运行)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 0, 5)
-    # croniter(* * * * *).get_prev(10:00:05) -> 10:00:00
-    engine.run_scheduler(sim_time)
-    # 应该为 Alice 和 Bob 创建 10:00:00 的任务 (ID 1, 2)
-    engine.print_table_status()
-
-    # T=2. 模拟 10:01:05 (调度器再次运行 - 幂等性测试)
-    engine.run_scheduler(sim_time)
-    # (注意：传入了和 T=1 相同的时间)
-    # (幂等性测试：不应该创建重复任务)
-    print("\n--- Running scheduler AGAIN at same time (idempotency test) ---")
-    engine.run_scheduler(sim_time)
-
-    # T=3. 模拟 10:01:05 (调度器在新的一分钟运行)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 1, 5)
-    engine.run_scheduler(sim_time)
-    # 应该为 Alice 和 Bob 创建 10:01:00 的任务 (ID 3, 4)
-    engine.print_table_status()
-
-    # T=4. 模拟 10:01:10 (Alice 完成了 T=1 的任务)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 1, 10)
-    engine.complete_task(todo_id=1, sim_time=sim_time)  # ID=1 (Alice@10:00)
-
-    # T=5. 模拟 10:03:00 (升级器运行)
-    # Bob@10:00 的任务 (ID=2) DDL 是 10:02:00, 应该被升级
-    # Bob@10:01 的任务 (ID=4) DDL 是 10:03:00, (<=) 暂时不升级
-    sim_time = datetime.datetime(2025, 11, 8, 10, 3, 0)
-    engine.run_escalation(sim_time)
-    engine.print_table_status()  # ID=2 变为 'escalated'
-
-    # T=6. 模拟 10:03:10 (Alice “错点”了 T=3 的任务)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 3, 10)
-    engine.revert_task_completion(todo_id=3, sim_time=sim_time)  # ID=3 (Alice@10:01)
-    # ID=3 的 DDL 是 10:06:00。
-    # 10:03:10 < 10:06:00, 所以应退回 'pending'
-    engine.print_table_status()  # ID=3 变为 'pending'
-
-    # T=7. 模拟 10:03:20 (Alice 又“错点”了 T=1 的任务)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 3, 20)
-    engine.revert_task_completion(todo_id=1, sim_time=sim_time)  # ID=1 (Alice@10:00)
-    # ID=1 的 DDL 是 10:05:00。
-    # 10:03:20 < 10:05:00, 所以应退回 'pending'
-    engine.print_table_status()  # ID=1 变为 'pending'
-
-    # T=8. 模拟 10:03:30 (管理员禁用了 Bob 的模板)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 3, 30)
-    engine.set_template_active_status(
-        template_id=template_bob_id, is_active=False, sim_time=sim_time
-    )
-    # 应该把 Bob 的 ID=2 ('escalated') 和 ID=4 ('pending') 都设为 'revoked'
-    engine.print_table_status()
-
-    # T=9. 模拟 10:04:05 (调度器再次运行)
-    sim_time = datetime.datetime(2025, 11, 8, 10, 4, 5)
-    # croniter(* * * * *).get_prev(10:04:05) -> 10:04:00
-    engine.run_scheduler(sim_time)
-    # 此时, Bob 的模板是 is_active=0
-    # 应该只为 Alice 创建 10:04:00 的任务 (ID=5)
-    engine.print_table_status()
+# 全局引擎实例
+db_manager = DatabaseManager("tasks.db")
+task_engine = TaskEngine(db_manager)
