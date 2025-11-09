@@ -1,17 +1,17 @@
 import os
 import logging
-from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from .utils.logger_config import setup_global_logger
-from .slack.app import app
 
+from .task.engine_launcher import launch_engine_scheduler
+from .slack.app import socket_mode_handler
 # register
-from .slack import listeners  # noqa: F401
 from .extra.flask_app import flask_app
 
 # for dev, bind slack events to flask app
-from .extra import dev  # noqa: F401
+from .extra import dev
 
+_ = dev  # to avoid unused import warning
 
 if __name__ == "__main__":
     assert os.environ.get("SLACK_APP_TOKEN") is not None, "SLACK_APP_TOKEN is required!"
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     #     )
     #     sys.exit(1)
 
-    # Create an app-level token with connections:write scope
-    handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
-    handler.connect()  # Keep the Socket Mode client running but non-blocking
+    launch_engine_scheduler()
+
+    socket_mode_handler.connect()  # Keep the Socket Mode client running but non-blocking
     flask_app.run(port=10443)

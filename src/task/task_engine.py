@@ -12,24 +12,27 @@ class TaskEngine:
         self.db = db_manager
         self.logger = logging.getLogger(__name__)
 
-    def _parse_bias(self, bias_str: str) -> timedelta:
-        """简单的 ddl_bias 解析器 (例如 '1h', '30m', '2d')"""
-        # (为了演示简洁性，我们只实现 'h' 和 'm')
-        if bias_str.endswith("h"):
-            return timedelta(hours=int(bias_str[:-1]))
-        elif bias_str.endswith("m"):
-            return timedelta(minutes=int(bias_str[:-1]))
+    def _parse_offset(self, offset_str: str) -> timedelta:
+        """handle simple ddl_offset like '5m', '2h', '1d' etc."""
+        unit = offset_str[-1]
+        value = int(offset_str[:-1])
+        if unit == "m":
+            return timedelta(minutes=value)
+        elif unit == "h":
+            return timedelta(hours=value)
+        elif unit == "d":
+            return timedelta(days=value)
         else:
-            raise ValueError(f"Unknown bias format: {bias_str}")
+            raise ValueError(f"Unsupported offset unit: {unit}")
 
     def _create_todo_transaction(
         self,
         cur,
         user_id,
         template_id,
-        ddl_bias,
+        ddl_offset,
         reminder_time: datetime.datetime,
-        sim_time: datetime.datetime,
+        create_time: datetime.datetime,
     ):
         """
         (内部函数) 在数据库事务中创建 todo 和 log。
@@ -37,7 +40,7 @@ class TaskEngine:
         - sim_time: 事务“实际”发生的时间 (现在)
         """
         # 1. 计算 DDL 时间
-        ddl_time = reminder_time + self._parse_bias(ddl_bias)
+        ddl_time = reminder_time + self._parse_offset(ddl_offset)
 
         # 2. 插入 todos 表
         cur.execute(
@@ -50,8 +53,8 @@ class TaskEngine:
                 user_id,
                 reminder_time.isoformat(),
                 ddl_time.isoformat(),
-                sim_time.isoformat(),
-                sim_time.isoformat(),
+                create_time.isoformat(),
+                create_time.isoformat(),
             ),
         )
 
@@ -63,27 +66,27 @@ class TaskEngine:
             INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at)
             VALUES (?, NULL, 'pending', ?)
             """,
-            (todo_id, sim_time.isoformat()),
+            (todo_id, create_time.isoformat()),
         )
         return todo_id
 
-    def run_scheduler(self, current_time: datetime.datetime):
+    def run_scheduler(self, current_time: datetime.datetime | str):
         """
-        (幂等调度器)
-        运行调度器，为所有“上一个应执行”但尚未创建的任务创建实例。
+        scheduler to create todos based on active templates
         """
-        self.logger.info(f"\n--- [SCHEDULER] running at {current_time} ---")
+        if isinstance(current_time, str):
+            current_time = datetime.datetime.fromisoformat(current_time)
+        self.logger.info(f"--- [SCHEDULER] running at {current_time} ---")
 
         created_count = 0
         try:
             with self.db as conn:
                 cur = conn.cursor()
-
-                # 1. 直接查询 task_templates
+                # no matter template create time, check all active templates
                 cur.execute(
                     """
-                    SELECT user_id, template_id, cron, ddl_bias, task_name, run_once
-                    FROM task_templates
+                    SELECT user_id, template_id, cron, ddl_offset, todo_content, run_once
+                    FROM todo_templates
                     WHERE is_active = 1
                 """
                 )
@@ -93,16 +96,15 @@ class TaskEngine:
                     user_id,
                     template_id,
                     cron,
-                    ddl_bias,
-                    task_name,
+                    ddl_offset,
+                    todo_content,
                     run_once,
                 ) in active_templates:
                     try:
-                        # 2. 获取“上一个”应执行的时间点
+                        # use croniter to find the last due time before current_time
                         cron_iter = croniter(cron, current_time)
                         last_due_time = cron_iter.get_prev(datetime.datetime)
-
-                        # 3. “判断”是否已存在
+                        # check if a todo already exists for this user/template/time
                         cur.execute(
                             """
                             SELECT 1 FROM todos
@@ -112,37 +114,36 @@ class TaskEngine:
                         )
 
                         if cur.fetchone():
-                            continue  # 已存在, 跳过
+                            continue  # already exists, skip
 
-                        # 4. 不存在, 在事务中创建
                         self.logger.info(
-                            f"[Scheduler] CREATING: Task for {user_id} ({task_name}) at {last_due_time}"
+                            f"[Scheduler] CREATING: Task for {user_id} ({todo_content}) at {last_due_time}"
                         )
-                        with conn:  # 使用 'with conn' 自动管理 commit/rollback
+                        with conn:
                             self._create_todo_transaction(
                                 cur,
                                 user_id,
                                 template_id,
-                                ddl_bias,
+                                ddl_offset,
                                 reminder_time=last_due_time,
-                                sim_time=current_time,
+                                create_time=current_time,
                             )
                         created_count += 1
                         if run_once:
-                            # 如果是“只运行一次”，则禁用模板，之后再设置is_active=1的话，还可以再进行“只运行一次”
+                            # if run_once, disable the template after creating the task
                             self.logger.info(
                                 f"[Scheduler] Disabling one-time template {template_id} for {user_id}"
                             )
                             cur.execute(
                                 """
-                                UPDATE task_templates SET is_active = 0 WHERE template_id = ?
+                                UPDATE todo_templates SET is_active = 0 WHERE template_id = ?
                             """,
                                 (template_id,),
                             )
 
                     except Exception as e:
                         self.logger.error(
-                            f"[Scheduler] ERROR processing {user_id} / {task_name}: {e}"
+                            f"[Scheduler] ERROR processing {user_id} / {todo_content}: {e}"
                         )
 
             if created_count == 0:
@@ -153,24 +154,25 @@ class TaskEngine:
         except sqlite3.Error as e:
             self.logger.error(f"[Scheduler] DB ERROR: {e}")
 
-    def run_escalation(self, simulation_time: datetime.datetime):
+    def run_escalator(self, current_time: datetime.datetime | str):
         """
-        (升级器)
-        检查并升级已过期的 'pending' 任务
+        escalator to escalate overdue tasks
         """
-        self.logger.info(f"\n--- [ESCALATOR] running at {simulation_time} ---")
+        if isinstance(current_time, str):
+            current_time = datetime.datetime.fromisoformat(current_time)
+        self.logger.info(f"--- [ESCALATOR] running at {current_time} ---")
 
         escalated_count = 0
         try:
             with self.db as conn:
                 cur = conn.cursor()
-                # 1. 查找所有状态为 'pending' 且已过 ddl_time 的任务
+
                 cur.execute(
                     """
-                    SELECT id FROM todos
+                    SELECT todo_id FROM todos
                     WHERE status = 'pending' AND ddl_time < ?
                 """,
-                    (simulation_time.isoformat(),),
+                    (current_time.isoformat(),),
                 )
 
                 tasks_to_escalate = cur.fetchall()
@@ -180,25 +182,24 @@ class TaskEngine:
                     return
 
                 for (todo_id,) in tasks_to_escalate:
-                    # 2. 在事务中更新
                     try:
                         with conn:
-                            # (a) 更新 todos 表
+                            # update todos table
                             cur.execute(
                                 """
                                 UPDATE todos SET status = 'escalated', updated_at = ?
-                                WHERE id = ? AND status = 'pending'
+                                WHERE todo_id = ? AND status = 'pending'
                             """,
-                                (simulation_time.isoformat(), todo_id),
+                                (current_time.isoformat(), todo_id),
                             )
 
-                            # (b) 插入 logs 表
+                            # insert into todo_status_logs table
                             cur.execute(
                                 """
                                 INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at)
                                 VALUES (?, 'pending', 'escalated', ?)
                             """,
-                                (todo_id, simulation_time.isoformat()),
+                                (todo_id, current_time.isoformat()),
                             )
 
                         self.logger.info(f"[Escalator] ESCALATED Todo {todo_id}")
@@ -213,74 +214,78 @@ class TaskEngine:
         except sqlite3.Error as e:
             self.logger.error(f"[Escalator] DB ERROR: {e}")
 
-    def complete_task(self, todo_id: int, sim_time: datetime.datetime):
-        """(用户操作) 完成任务"""
-        self.logger.info(f"\n--- [USER] Completing Todo {todo_id} at {sim_time} ---")
+    def complete_task(self, todo_id: int, current_time: datetime.datetime | str):
+        """user completes a task"""
+        if isinstance(current_time, str):
+            current_time = datetime.datetime.fromisoformat(current_time)
+        self.logger.info(f"--- [USER] Completing Todo {todo_id} at {current_time} ---")
         try:
             with self.db as conn:
-                with conn:  # 自动事务
-                    cur = conn.cursor()
-                    cur.execute("SELECT status FROM todos WHERE id = ?", (todo_id,))
-                    result = cur.fetchone()
+                cur = conn.cursor()
+                cur.execute("SELECT status FROM todos WHERE todo_id = ?", (todo_id,))
+                result = cur.fetchone()
 
-                    if not result:
-                        self.logger.error(f"ERROR: Todo {todo_id} not found.")
-                        return
+                if not result:
+                    self.logger.error(f"ERROR: Todo {todo_id} not found.")
+                    return
 
-                    old_status = result[0]
-                    if old_status in ("completed", "revoked"):
-                        self.logger.info(
-                            f"Todo {todo_id} is already in a final state ({old_status})."
-                        )
-                        return
-
-                    cur.execute(
-                        "UPDATE todos SET status = 'completed', updated_at = ? WHERE id = ?",
-                        (sim_time.isoformat(), todo_id),
+                old_status = result[0]
+                if old_status in ("completed", "revoked"):
+                    self.logger.info(
+                        f"Todo {todo_id} is already in a final state ({old_status})."
                     )
-                    cur.execute(
-                        "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, ?, 'completed', ?)",
-                        (todo_id, old_status, sim_time.isoformat()),
-                    )
+                    return
+
+                cur.execute(
+                    "UPDATE todos SET status = 'completed', updated_at = ? WHERE todo_id = ?",
+                    (current_time.isoformat(), todo_id),
+                )
+                cur.execute(
+                    "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, ?, 'completed', ?)",
+                    (todo_id, old_status, current_time.isoformat()),
+                )
                 self.logger.info(f"COMPLETED Todo {todo_id} (was {old_status})")
         except sqlite3.Error as e:
             self.logger.error(f"ERROR completing Todo {todo_id}: {e}")
 
-    def revert_task_completion(self, todo_id: int, sim_time: datetime.datetime):
-        """(用户操作) 撤销完成 (错点了)"""
-        self.logger.info(f"\n--- [USER] Reverting Todo {todo_id} at {sim_time} ---")
+    def revert_task_completion(
+        self, todo_id: int, current_time: datetime.datetime | str
+    ):
+        """user reverts a completed task back to pending/escalated"""
+        if isinstance(current_time, str):
+            current_time = datetime.datetime.fromisoformat(current_time)
+        self.logger.info(f"--- [USER] Reverting Todo {todo_id} at {current_time} ---")
         try:
             with self.db as conn:
-                with conn:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "SELECT status, ddl_time FROM todos WHERE id = ?", (todo_id,)
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT status, ddl_time FROM todos WHERE todo_id = ?", (todo_id,)
+                )
+                result = cur.fetchone()
+
+                if not result:
+                    self.logger.error(f"ERROR: Todo {todo_id} not found.")
+                    return
+                old_status, ddl_time_str = result
+
+                if old_status != "completed":
+                    self.logger.error(
+                        f"ERROR: Todo {todo_id} is not 'completed'. Cannot revert."
                     )
-                    result = cur.fetchone()
+                    return
 
-                    if not result:
-                        self.logger.error(f"ERROR: Todo {todo_id} not found.")
-                        return
-                    old_status, ddl_time_str = result
+                # we determine new status based on ddl_time
+                ddl_time = datetime.datetime.fromisoformat(ddl_time_str)
+                new_status = "escalated" if current_time >= ddl_time else "pending"
 
-                    if old_status != "completed":
-                        self.logger.error(
-                            f"ERROR: Todo {todo_id} is not 'completed'. Cannot revert."
-                        )
-                        return
-
-                    # 关键逻辑：决定退回哪个状态
-                    ddl_time = datetime.datetime.fromisoformat(ddl_time_str)
-                    new_status = "escalated" if sim_time >= ddl_time else "pending"
-
-                    cur.execute(
-                        "UPDATE todos SET status = ?, updated_at = ? WHERE id = ?",
-                        (new_status, sim_time.isoformat(), todo_id),
-                    )
-                    cur.execute(
-                        "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, 'completed', ?, ?)",
-                        (todo_id, new_status, sim_time.isoformat()),
-                    )
+                cur.execute(
+                    "UPDATE todos SET status = ?, updated_at = ? WHERE todo_id = ?",
+                    (new_status, current_time.isoformat(), todo_id),
+                )
+                cur.execute(
+                    "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, 'completed', ?, ?)",
+                    (todo_id, new_status, current_time.isoformat()),
+                )
                 self.logger.info(
                     f"REVERTED Todo {todo_id} from 'completed' back to '{new_status}'"
                 )
@@ -288,62 +293,63 @@ class TaskEngine:
             self.logger.error(f"ERROR reverting Todo {todo_id}: {e}")
 
     def set_template_active_status(
-        self, template_id: int, is_active: bool, sim_time: datetime.datetime
+        self, template_id: int, is_active: bool, current_time: datetime.datetime | str
     ):
-        """(管理员操作) 禁用或启用模板，并作废相关任务"""
+        """admin activates/deactivates a template"""
+        if isinstance(current_time, str):
+            current_time = datetime.datetime.fromisoformat(current_time)
         status_str = "Activating" if is_active else "Deactivating"
         self.logger.info(
-            f"\n--- [ADMIN] {status_str} Template {template_id} at {sim_time} ---"
+            f"--- [ADMIN] {status_str} Template {template_id} at {current_time} ---"
         )
 
         try:
             with self.db as conn:
-                with conn:  # 自动事务
-                    cur = conn.cursor()
+                cur = conn.cursor()
 
-                    # 1. 更新模板本身
+                # update template active status
+                cur.execute(
+                    "UPDATE todo_templates SET is_active = ? WHERE template_id = ?",
+                    (1 if is_active else 0, template_id),
+                )
+
+                tasks_to_revoke = []
+
+                if not is_active:
+                    # if deactivating, revoke all pending/escalated tasks from this template
                     cur.execute(
-                        "UPDATE task_templates SET is_active = ? WHERE template_id = ?",
-                        (1 if is_active else 0, template_id),
+                        """
+                        SELECT todo_id, status FROM todos 
+                        WHERE template_id = ? AND status IN ('pending', 'escalated')
+                    """,
+                        (template_id,),
                     )
 
-                    tasks_to_revoke = []
-                    # 2. (核心) 如果是“禁用”，则 Revoke 所有未完成的任务
-                    if not is_active:
-                        # 查找所有这个模板的 'pending' 或 'escalated' 任务
+                    tasks_to_revoke = cur.fetchall()
+                    if not tasks_to_revoke:
+                        self.logger.info("No active todos to revoke.")
+
+                    for todo_id, old_status in tasks_to_revoke:
+                        self.logger.info(
+                            f"REVOKING Todo {todo_id} (was {old_status})..."
+                        )
+                        # update todos
                         cur.execute(
                             """
-                            SELECT id, status FROM todos 
-                            WHERE template_id = ? AND status IN ('pending', 'escalated')
+                            UPDATE todos SET status = 'revoked', updated_at = ?
+                            WHERE todo_id = ?
                         """,
-                            (template_id,),
+                            (current_time.isoformat(), todo_id),
                         )
 
-                        tasks_to_revoke = cur.fetchall()
-                        if not tasks_to_revoke:
-                            self.logger.info("No active todos to revoke.")
-
-                        for todo_id, old_status in tasks_to_revoke:
-                            self.logger.info(
-                                f"REVOKING Todo {todo_id} (was {old_status})..."
-                            )
-                            # (a) 更新 todos
-                            cur.execute(
-                                """
-                                UPDATE todos SET status = 'revoked', updated_at = ?
-                                WHERE id = ?
-                            """,
-                                (sim_time.isoformat(), todo_id),
-                            )
-
-                            # (b) 插入 logs (现在我们有 old_status 了)
-                            cur.execute(
-                                """
-                                INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at)
-                                VALUES (?, ?, 'revoked', ?)
-                            """,
-                                (todo_id, old_status, sim_time.isoformat()),
-                            )
+                        # insert into todo_status_logs
+                        cur.execute(
+                            """
+                            INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at)
+                            VALUES (?, ?, 'revoked', ?)
+                        """,
+                            (todo_id, old_status, current_time.isoformat()),
+                        )
 
                 self.logger.info(
                     f"Successfully set Template {template_id} active status to {is_active}"
@@ -356,103 +362,125 @@ class TaskEngine:
         except sqlite3.Error as e:
             self.logger.error(f"ERROR changing template status: {e}")
 
-    # --- 辅助函数 ---
-    def add_template(self, user_id, name, cron, bias, run_once=0):
-        self.logger.info(f"\nAdding template for {user_id}: {name}")
+    def add_template(self, user_id, todo_content, cron, ddl_offset, run_once=0):
+        """
+        Add a new task template for a todo.
+        Returns the template_id of the newly created template.
+        """
+        self.logger.info(f"Adding template for {user_id}: {todo_content}")
         with self.db as conn:
-            with conn:
-                cur = conn.cursor()
-                cur.execute(
-                    "INSERT INTO task_templates (user_id, task_name, cron, ddl_bias, run_once) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, name, cron, bias, run_once),
-                )
-                return cur.lastrowid  # 返回 template_id
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
+                (user_id, todo_content, cron, ddl_offset, run_once),
+            )
+            return cur.lastrowid  # template_id
 
-    def print_table_status(self):
-        """辅助函数：打印当前所有状态"""
-        print("\n" + "=" * 50)
-        print("CURRENT TABLE STATUS")
-        print("=" * 50)
+    def db_content(self):
+        """
+        Return string representation of all tables for debugging.
+        """
+        return self.db.full_content()
+
+    def get_templates(self):
+        """get all todo templates"""
+        self.logger.info(f"[QUERY] Getting all todo templates")
         try:
             with self.db as conn:
                 cur = conn.cursor()
-
-                print("\n--- Todos (Current Status) ---")
-                cur.execute(
-                    "SELECT id, user_id, template_id, status, reminder_time, ddl_time FROM todos ORDER BY id"
-                )
-                rows = cur.fetchall()
-                if not rows:
-                    print("Empty")
-                for row in rows:
-                    print(row)
-
-                print("\n--- Todo Status Logs (History) ---")
-                cur.execute(
-                    "SELECT log_id, todo_id, old_status, new_status, changed_at FROM todo_status_logs ORDER BY todo_id, log_id"
-                )
-                rows = cur.fetchall()
-                if not rows:
-                    print("Empty")
-                for row in rows:
-                    print(row)
-            print("=" * 50 + "\n")
-        except sqlite3.Error as e:
-            print(f"ERROR printing status: {e}")
-
-    def get_todos(self, query_date: datetime.date):
-        """辅助函数：获取指定日期的 todos"""
-        print(f"\n--- [QUERY] Getting todos for reminder date: {query_date} ---")
-        try:
-            with self.db as conn:
-                cur = conn.cursor()
-
-                # 1. JOIN task_templates 以获取 task_name
-                # 2. 使用 DATE(td.reminder_time) 来匹配 YYYY-MM-DD
-                # 3. Python 的 'datetime.date' 对象 (query_date)
-                #    会被 sqlite3 库自动转换为 'YYYY-MM-DD' 字符串用于查询。
                 cur.execute(
                     """
                     SELECT 
-                        td.id, 
-                        t.task_name, 
-                        td.user_id, 
-                        td.status, 
-                        td.reminder_time, 
-                        td.ddl_time
-                    FROM todos td
-                    JOIN task_templates t ON td.template_id = t.template_id
-                    WHERE DATE(td.reminder_time) = ?
-                    ORDER BY td.user_id, td.reminder_time
-                    """,
-                    (query_date,),
+                        template_id,
+                        user_id,
+                        todo_content,
+                        cron,
+                        ddl_offset,
+                        is_active,
+                        run_once,
+                        created_at
+                    FROM todo_templates
+                    ORDER BY template_id
+                    """
                 )
 
                 results = cur.fetchall()
-                print(f"Found {len(results)} todos for {query_date}.")
                 return results
-
         except sqlite3.Error as e:
-            print(f"ERROR querying todos: {e}")
+            self.logger.info(f"ERROR querying todo templates: {e}")
+            return []
+
+    def get_todos(self, query_date: datetime.date | str = None):
+        """get todos for a specific date (YYYY-MM-DD) or all if None"""
+        if query_date and isinstance(query_date, str):
+            query_date = datetime.date.fromisoformat(query_date).date()
+        self.logger.info(f"[QUERY] Getting todos for reminder date: {query_date}")
+        try:
+            with self.db as conn:
+                cur = conn.cursor()
+                if query_date:
+                    date_str = query_date.isoformat()
+                    cur.execute(
+                        """
+                        SELECT 
+                            td.todo_id, 
+                            t.template_id,
+                            t.todo_content, 
+                            td.user_id, 
+                            td.status, 
+                            td.reminder_time, 
+                            td.ddl_time
+                        FROM todos td
+                        JOIN todo_templates t ON td.template_id = t.template_id
+                        WHERE DATE(td.reminder_time) = ?
+                        ORDER BY td.reminder_time
+                        """,
+                        (date_str,),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT 
+                            td.todo_id,
+                            t.template_id,
+                            t.todo_content, 
+                            td.user_id, 
+                            td.reminder_time,
+                            td.ddl_time,
+                            td.status,
+                            td.created_at,
+                            td.updated_at
+                        FROM todos td
+                        JOIN todo_templates t ON td.template_id = t.template_id
+                        ORDER BY td.reminder_time
+                        """
+                    )
+
+                results = cur.fetchall()
+                return results
+        except sqlite3.Error as e:
+            self.logger.info(f"ERROR querying todos: {e}")
             return []
 
     def get_todo(self, todo_id: int):
-        """辅助函数：获取单个 todo 详情"""
+        """get a specific todo by todo_id"""
         try:
             with self.db as conn:
                 cur = conn.cursor()
                 cur.execute(
                     """
                     SELECT 
-                        td.id, 
-                        t.task_name, 
+                        td.todo_id, 
+                        t.todo_content, 
                         td.user_id, 
-                        td.status, 
                         td.reminder_time, 
-                        td.ddl_time
+                        td.ddl_time,
+                        td.status,
+                        td.created_at,
+                        td.updated_at
                     FROM todos td
-                    JOIN task_templates t ON td.template_id = t.template_id
-                    WHERE td.id = ?
+                    JOIN todo_templates t ON td.template_id = t.template_id
+                    WHERE td.todo_id = ?
                     """,
                     (todo_id,),
                 )
@@ -460,7 +488,7 @@ class TaskEngine:
                 return result
 
         except sqlite3.Error as e:
-            print(f"ERROR querying todo {todo_id}: {e}")
+            self.logger.info(f"ERROR querying todo {todo_id}: {e}")
             return None
 
 

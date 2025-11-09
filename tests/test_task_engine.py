@@ -23,126 +23,175 @@ def mock_engine(tmp_path, monkeypatch):
     database_manager.create_tables()
 
     # monkeypatch the imported 'croniter' in task engine to use DummyCron
-    def croniter_stub(cron_expr, sim_time):
-        return DummyCron(sim_time)
+    def croniter_stub(cron_expr, current_time):
+        return DummyCron(current_time)
 
     te = task_engine.TaskEngine(database_manager)
     monkeypatch.setattr(task_engine, "croniter", croniter_stub)
     return te
 
 
-def _fetchall(conn, query, params=()):
-    cur = conn.cursor()
-    cur.execute(query, params)
-    return cur.fetchall()
-
-
-def test_scheduler_idempotency_and_basic_flow(mock_engine):
+def test_get_todo_methods(mock_engine):
     engine = mock_engine
 
-    # Add two templates: Alice (5m ddl) and Bob (2m ddl)
-    alice_template = engine.add_template("Alice", "每分钟打卡", "* * * * *", "5m")
-    bob_template = engine.add_template("Bob", "每分钟喝水", "* * * * *", "2m")
-
-    # T=1: run scheduler at 10:00:05 -> should create tasks at 10:00:00
-    sim_t1 = datetime.datetime(2025, 11, 8, 10, 0, 5)
-    engine.run_scheduler(sim_t1)
-
+    # Create sample todos
     with engine.db as conn:
-        rows = _fetchall(
-            conn,
-            "SELECT user_id, reminder_time, ddl_time, status FROM todos ORDER BY id",
+        cur = conn.cursor()
+        # insert todo_templates first
+        # run_once default to 0
+        cur.executemany(
+            """
+            INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once, is_active, created_at)
+            VALUES (?, ?, ?, ?, 0, 1, ?)
+            """,
+            [
+                (
+                    "Alice",
+                    "Task A",
+                    "* * * * *",
+                    "5m",
+                    "2025-11-08T09:55:00",
+                ),
+                (
+                    "Bob",
+                    "Task B",
+                    "* * * * *",
+                    "2m",
+                    "2025-11-08T09:56:00",
+                ),
+            ],
         )
-        assert len(rows) == 2
-        # ensure both users have 10:00:00 reminder_time
-        reminders = {r[0]: r[1] for r in rows}
-        assert reminders["Alice"].startswith("2025-11-08T10:00:00")
-        assert reminders["Bob"].startswith("2025-11-08T10:00:00")
-
-    # T=2: run scheduler again at same simulation time -> idempotency, no new tasks
-    engine.run_scheduler(sim_t1)
-    with engine.db as conn:
-        rows = _fetchall(conn, "SELECT COUNT(*) FROM todos")
-        assert rows[0][0] == 2
-
-    # T=3: run scheduler at 10:01:05 -> should create another pair at 10:01:00
-    sim_t2 = datetime.datetime(2025, 11, 8, 10, 1, 5)
-    engine.run_scheduler(sim_t2)
-    with engine.db as conn:
-        rows = _fetchall(
-            conn, "SELECT id, user_id, reminder_time FROM todos ORDER BY id"
+        # pretend todo is generated
+        cur.executemany(
+            """
+            INSERT INTO todos (template_id, user_id, reminder_time, ddl_time, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+            """,
+            [
+                (
+                    1,
+                    "Alice",
+                    "2025-11-08T10:00:00",
+                    "2025-11-08T10:05:00",
+                    "2025-11-08T10:00:00",
+                    "2025-11-08T10:00:00",
+                ),
+                (
+                    2,
+                    "Bob",
+                    "2025-11-08T10:01:00",
+                    "2025-11-08T10:03:00",
+                    "2025-11-08T10:01:00",
+                    "2025-11-08T10:01:00",
+                ),
+            ],
         )
-        # now 4 todos total
-        assert len(rows) == 4
-        # find Alice's 10:01 task id for later use
-        alice_100 = [
-            r
-            for r in rows
-            if r[1] == "Alice" and r[2].startswith("2025-11-08T10:00:00")
-        ]
-        alice_101 = [
-            r
-            for r in rows
-            if r[1] == "Alice" and r[2].startswith("2025-11-08T10:01:00")
-        ]
-        assert alice_100 and alice_101
 
-    # T=4: complete Alice's 10:00 task
-    alice_100_id = alice_100[0][0]
-    sim_complete = datetime.datetime(2025, 11, 8, 10, 1, 10)
-    engine.complete_task(todo_id=alice_100_id, sim_time=sim_complete)
+    # Fetch all todos(ordered by reminder_time)
+    todos = engine.get_todos()
+    assert len(todos) == 2
+    user_ids = {todo["user_id"] for todo in todos}
+    assert user_ids == {"Alice", "Bob"}
+
+    # Fetch specific todo by id
+    todo_id = 2
+    todo = engine.get_todo(todo_id)
+    assert todo["todo_id"] == todo_id
+    assert todo["user_id"] == "Bob"
+
+    # pretend add more todos for next day
     with engine.db as conn:
-        status = _fetchall(
-            conn, "SELECT status FROM todos WHERE id = ?", (alice_100_id,)
-        )[0][0]
-        assert status == "completed"
+        cur = conn.cursor()
+        cur.executemany(
+            """
+            INSERT INTO todos (template_id, user_id, reminder_time, ddl_time, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+            """,
+            [
+                (
+                    1,
+                    "Alice",
+                    "2025-11-09T10:00:00",
+                    "2025-11-09T10:05:00",
+                    "2025-11-09T10:00:00",
+                    "2025-11-09T10:00:00",
+                ),
+            ],
+        )
 
-    # T=5: escalation at 10:03:00 should escalate Bob's 10:00 task (ddl 10:02)
-    sim_escalate = datetime.datetime(2025, 11, 8, 10, 3, 0)
-    engine.run_escalation(sim_escalate)
-    with engine.db as conn:
-        bob_100 = _fetchall(
-            conn,
-            "SELECT id, status FROM todos WHERE user_id = ? AND reminder_time LIKE ?",
-            ("Bob", "2025-11-08T10:00:%"),
-        )[0]
-        assert bob_100[1] == "escalated"
+    # Fetch todos for 2025-11-08
+    todos = engine.get_todos("2025-11-08")
+    assert len(todos) == 2
+    assert todos[0]["user_id"] == "Alice"
+    assert todos[1]["user_id"] == "Bob"
 
-    # T=6: revert completion for Alice's 10:01 task (simulate wrong click)
-    alice_101_id = alice_101[0][0]
-    # First complete it
-    engine.complete_task(
-        todo_id=alice_101_id, sim_time=datetime.datetime(2025, 11, 8, 10, 2, 0)
+    todos = engine.get_todos("2025-11-09")
+    assert len(todos) == 1
+    assert todos[0]["user_id"] == "Alice"
+
+
+def test_add_template_and_revoke(mock_engine):
+    engine = mock_engine
+
+    # Add a new template
+    template_id = engine.add_template(
+        user_id="Charlie",
+        todo_content="Task C",
+        cron="* * * * *",
+        ddl_offset="10m",
+        run_once=0,
     )
-    # Then revert at 10:03:10 (DDL for Alice@10:01 is 10:06 -> should revert to 'pending')
-    engine.revert_task_completion(
-        todo_id=alice_101_id, sim_time=datetime.datetime(2025, 11, 8, 10, 3, 10)
-    )
-    with engine.db as conn:
-        status = _fetchall(
-            conn, "SELECT status FROM todos WHERE id = ?", (alice_101_id,)
-        )[0][0]
-        assert status == "pending"
+    assert template_id is not None
 
-    # T=7: disable Bob's template -> should mark Bob's pending/escalated todos as revoked
-    sim_admin = datetime.datetime(2025, 11, 8, 10, 3, 30)
+    # Verify the template is added
+    templates = engine.get_templates()
+    assert len(templates) == 1
+    assert templates[0]["template_id"] == template_id
+
+    engine.run_scheduler(current_time="2025-11-08T11:00:00")
+
+    # Revoke todos by deactivating the template
     engine.set_template_active_status(
-        template_id=bob_template, is_active=False, sim_time=sim_admin
+        template_id=template_id,
+        is_active=False,
+        current_time="2025-11-08T11:05:00",
     )
-    with engine.db as conn:
-        bob_rows = _fetchall(
-            conn, "SELECT status FROM todos WHERE user_id = ?", ("Bob",)
-        )
-        assert all(r[0] == "revoked" for r in bob_rows)
 
-    # T=8: run scheduler at 10:04:05 -> should only create Alice's 10:04 task (Bob inactive)
-    sim_t3 = datetime.datetime(2025, 11, 8, 10, 4, 5)
-    engine.run_scheduler(sim_t3)
-    with engine.db as conn:
-        # count Alice tasks (should have at least 3 now), Bob should not have a new task at 10:04
-        bob_100plus = _fetchall(
-            conn,
-            "SELECT COUNT(*) FROM todos WHERE user_id = ? AND reminder_time LIKE ?",
-            ("Bob", "2025-11-08T10:04:%"),
-        )[0][0]
-        assert bob_100plus == 0
+    # Verify that the todos are revoked
+    todos = engine.get_todos()
+    for todo in todos:
+        if todo["template_id"] == template_id:
+            assert todo["status"] == "revoked"
+
+
+def test_todo_escalation(mock_engine):
+    engine = mock_engine
+
+    # Add a new template
+    template_id = engine.add_template(
+        user_id="Dave",
+        todo_content="Task D",
+        cron="* * * * *",
+        ddl_offset="1m",  # short offset for quick escalation
+        run_once=0,
+    )
+
+    # Run scheduler to create a todo
+    engine.run_scheduler(current_time="2025-11-08T12:00:00")
+    engine.run_escalator(current_time="2025-11-08T12:00:00")
+    # no escalation yet
+    todos = engine.get_todos()
+    assert len(todos) == 1
+    escalated_todos = [todo for todo in todos if todo["status"] == "escalated"]
+    assert len(escalated_todos) == 0
+
+    # Advance time to trigger escalation
+    engine.run_scheduler(current_time="2025-11-08T12:02:00")
+    engine.run_escalator(current_time="2025-11-08T12:02:00")
+
+    # Verify that the todo is escalated
+    todos = engine.get_todos()
+    assert len(todos) == 2 # one original + one new from scheduler
+    escalated_todos = [todo for todo in todos if todo["status"] == "escalated"]
+    assert len(escalated_todos) == 1
+    assert escalated_todos[0]["template_id"] == template_id

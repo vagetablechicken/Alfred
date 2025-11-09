@@ -26,9 +26,9 @@ def handle_log_todo_button(ack, body, client, logger):
 
     try:
         todo_id = int(todo_id_str)
-        sim_time = datetime.now()
+        current_time = datetime.now()
 
-        task_engine.complete_task(todo_id, sim_time)
+        task_engine.complete_task(todo_id, current_time)
 
         # update the message to reflect the completed status
 
@@ -45,7 +45,7 @@ def handle_log_todo_button(ack, body, client, logger):
                 "block_id": section_block_id,  # 保持 block_id 一致
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"~*[ID: {todo_id}]* `{task_name}`~ (✅ 已完成)",
+                    "text": f"~*[ID: {todo_id}]* `{todo_content}`~ (✅ 已完成)",
                 },
             },
             {
@@ -109,22 +109,22 @@ def handle_undo_log_button(ack, body, client, logger):
 
     try:
         todo_id = int(todo_id_str)
-        sim_time = datetime.now()
+        current_time = datetime.now()
 
         # 3. (核心) 调用引擎“撤销”
         # (您需要先在 TaskEngine 中实现这个 revert_task_completion)
         # (我们之前的对话中已经创建了这个函数)
-        engine.revert_task_completion(todo_id, sim_time)
+        engine.revert_task_completion(todo_id, current_time)
 
         # 4. (核心) 更新消息，把它换回“Pending”状态的 blocks
 
         # (新) 创建 "Pending" 状态的 blocks
-        # (您需要一种方式从 DB 重新获取 task_name 和 status,
+        # (您需要一种方式从 DB 重新获取 todo_content 和 status,
         #  或者从原始 block text 中解析)
 
         # (为简洁起见，我们假设 revert 总是回到 'pending')
         new_status = "pending"
-        task_name = f"Task {todo_id}"  # (同样，这里应该从 DB 或 block 中获取)
+        todo_content = f"Task {todo_id}"  # (同样，这里应该从 DB 或 block 中获取)
 
         pending_blocks = [
             {
@@ -132,7 +132,7 @@ def handle_undo_log_button(ack, body, client, logger):
                 "block_id": action["block_id"].replace("_actions", "_section"),
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*[ID: {todo_id}]* `{task_name}`\n*状态*: {new_status}",
+                    "text": f"*[ID: {todo_id}]* `{todo_content}`\n*状态*: {new_status}",
                 },
             },
             {

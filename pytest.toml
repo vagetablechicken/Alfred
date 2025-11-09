@@ -2,3 +2,5 @@
 pythonpath = ["src"]
 addopts = ["--import-mode=importlib"]
 testpaths = ["tests"]
+log_cli = true
+log_cli_level = "DEBUG"
