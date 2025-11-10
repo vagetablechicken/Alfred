@@ -1,7 +1,7 @@
 import os
 import logging
 
-from .utils.logger_config import setup_global_logger
+from .utils.config import setup_global_logger
 
 from .task.engine_launcher import launch_engine_scheduler
 from .slack.app import socket_mode_handler

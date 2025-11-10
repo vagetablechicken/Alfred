@@ -5,7 +5,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from ..task.task_engine import task_engine
 
 
-def reminder_job():
+def patrol_job():
     current_time = datetime.now()
     # read from engine, if tasks are due, send reminders
     todos = task_engine.get_todos(current_time.date())
@@ -18,7 +18,7 @@ def reminder_job():
     # TODO: send reminders via Slack API
 
 
-def launch_engine_scheduler():
+def launch_patrol_scheduler():
     # only 1 worker thread
     executors = {"default": ThreadPoolExecutor(max_workers=1)}
 
@@ -26,10 +26,10 @@ def launch_engine_scheduler():
 
     try:
         scheduler.add_job(
-            func=reminder_job,
+            func=patrol_job,
             trigger="interval",
             seconds=60,  # run every minute
-            id="reminder_job",
+            id="butler_patrol_job",
             replace_existing=True,
             misfire_grace_time=60,
         )
