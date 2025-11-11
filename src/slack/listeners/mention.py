@@ -1,6 +1,6 @@
 from datetime import datetime
 from ..app import app
-from ...task.task_engine import task_engine
+from ..butler import butler
 
 
 @app.event("app_mention")
@@ -18,7 +18,7 @@ def handle_app_mention(event, client, logger):
     ):
         client.chat_postEphemeral(f"Hello there, <@{event['user']}>!")
     elif message_text.lower().find("list") != -1:
-        todos = task_engine.get_todos(datetime.today().date())  # get all today's todos
+        todos = butler.get_todos(datetime.today().date())  # get all today's todos
         todo_list = (
             "\n".join([f"• {t[0]}" for t in todos]) if todos else "_No todos found._"
         )

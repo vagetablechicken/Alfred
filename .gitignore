@@ -80,4 +80,6 @@ staticfiles/
 *.swp
 *.tmp
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3

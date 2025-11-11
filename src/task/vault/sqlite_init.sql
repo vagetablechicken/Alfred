@@ -11,12 +11,12 @@ CREATE TABLE IF NOT EXISTS todo_templates (
     created_at TEXT DEFAULT (DATETIME('now', 'localtime'))
 );
 
--- 任务实例表
+-- 任务实例表 escalated暂时没用
 CREATE TABLE IF NOT EXISTS todos (
     todo_id INTEGER PRIMARY KEY AUTOINCREMENT,
     template_id INTEGER NOT NULL,
     user_id TEXT NOT NULL,
-    reminder_time TEXT NOT NULL,
+    remind_time TEXT NOT NULL,
     ddl_time TEXT NOT NULL,
     status TEXT DEFAULT 'pending' NOT NULL 
         CHECK(status IN ('pending', 'completed', 'revoked', 'escalated')), 

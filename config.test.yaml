@@ -1,7 +1,6 @@
 # Alfred 测试环境配置
-database:
-  # auto cleanup by cleanup_test_db fixture
-  path: "test_tasks.db"  # 使用测试数据库文件
+vault:
+  path: "test.db"  # 使用测试数据库文件
 
 logging:
   level: "DEBUG"

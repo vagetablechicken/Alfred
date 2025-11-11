@@ -1,6 +1,7 @@
-# Alfred 生产环境配置
-database:
-  path: "tasks.db"  # 数据库文件路径（相对于项目根目录）
+# Alfred production environment configuration
+vault:
+  path: "prod.db" # Database file path (relative to project root)
+  init_sql: "" # if empty, use default init sql
 
 logging:
   level: "INFO"
@@ -8,3 +9,6 @@ logging:
 scheduler:
   interval_seconds: 60
   escalator_interval_seconds: 300
+
+slack:
+  channel: "C09RC3VSA94"  # test-channel

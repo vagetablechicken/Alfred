@@ -1,42 +1,41 @@
-from datetime import datetime
+from datetime import datetime, date
 import logging
 import sqlite3
 
-from .database.archive import get_archive  # import the singleton Archive instance
+from .vault import LockedSqliteVault  # import the singleton vault instance
 
 
 class Bulletin:
     """
-    Read raw meta data from singleton Archive instance. Manage templates and todos.
+    Read raw meta data from singleton vault instance. Manage templates and todos.
     """
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.vault = LockedSqliteVault()
 
     def complete_todo(self, todo_id: int, current_time: datetime | str):
         """User completes a todo"""
         if isinstance(current_time, str):
             current_time = datetime.fromisoformat(current_time)
         self.logger.info(f"--- [USER] Completing Todo {todo_id} at {current_time} ---")
-        archive = get_archive()
         try:
-            result = archive.read(
-                "SELECT status FROM todos WHERE todo_id = ?", (todo_id,)
-            )
-            old_status = result[0]
-            if old_status in ("completed", "revoked"):
-                self.logger.info(
-                    f"Todo {todo_id} is already in a final state ({old_status})."
+            with self.vault.transaction() as cur:
+                result = cur.execute(
+                    "SELECT status FROM todos WHERE todo_id = ?", (todo_id,)
                 )
-                return
+                old_status = result[0]
+                if old_status in ("completed", "revoked"):
+                    self.logger.info(
+                        f"Todo {todo_id} is already in a final state ({old_status})."
+                    )
+                    return
 
-            # update in one transaction
-            with archive:
-                archive.write(
+                cur.execute(
                     "UPDATE todos SET status = 'completed', updated_at = ? WHERE todo_id = ?",
                     (current_time.isoformat(), todo_id),
                 )
-                archive.write(
+                cur.execute(
                     "INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, ?, 'completed', ?)",
                     (todo_id, old_status, current_time.isoformat()),
                 )
@@ -44,25 +43,25 @@ class Bulletin:
         except sqlite3.Error as e:
             self.logger.error(f"ERROR completing Todo {todo_id}: {e}")
 
-    def revert_task_completion(
-        self, todo_id: int, current_time: datetime.datetime | str
-    ):
+    def revert_todo_completion(self, todo_id: int, current_time: datetime | str):
         """user reverts a completed task back to pending/escalated"""
         if isinstance(current_time, str):
             current_time = datetime.datetime.fromisoformat(current_time)
         self.logger.info(f"--- [USER] Reverting Todo {todo_id} at {current_time} ---")
         try:
-            with self.db as conn:
-                cur = conn.cursor()
-                cur.execute(
+            with self.vault.transaction() as cur:
+                result = cur.execute(
                     "SELECT status, ddl_time FROM todos WHERE todo_id = ?", (todo_id,)
                 )
-                result = cur.fetchone()
 
                 if not result:
                     self.logger.error(f"ERROR: Todo {todo_id} not found.")
                     return
-                old_status, ddl_time_str = result
+                assert (
+                    len(result) == 1
+                ), f"Expected one result for todo_id {todo_id}, got {len(result)}"
+
+                old_status, ddl_time_str = result[0]["status"], result[0]["ddl_time"]
 
                 if old_status != "completed":
                     self.logger.error(
@@ -89,20 +88,18 @@ class Bulletin:
             self.logger.error(f"ERROR reverting Todo {todo_id}: {e}")
 
     def set_template_active_status(
-        self, template_id: int, is_active: bool, current_time: datetime.datetime | str
+        self, template_id: int, is_active: bool, current_time: datetime | str
     ):
         """admin activates/deactivates a template"""
         if isinstance(current_time, str):
-            current_time = datetime.datetime.fromisoformat(current_time)
+            current_time = datetime.fromisoformat(current_time)
         status_str = "Activating" if is_active else "Deactivating"
         self.logger.info(
             f"--- [ADMIN] {status_str} Template {template_id} at {current_time} ---"
         )
 
         try:
-            with self.db as conn:
-                cur = conn.cursor()
-
+            with self.vault.transaction() as cur:
                 # update template active status
                 cur.execute(
                     "UPDATE todo_templates SET is_active = ? WHERE template_id = ?",
@@ -113,15 +110,14 @@ class Bulletin:
 
                 if not is_active:
                     # if deactivating, revoke all pending/escalated tasks from this template
-                    cur.execute(
+                    tasks_to_revoke = cur.execute(
                         """
                         SELECT todo_id, status FROM todos 
                         WHERE template_id = ? AND status IN ('pending', 'escalated')
                     """,
                         (template_id,),
-                    )
+                    ).fetchall()
 
-                    tasks_to_revoke = cur.fetchall()
                     if not tasks_to_revoke:
                         self.logger.info("No active todos to revoke.")
 
@@ -164,125 +160,133 @@ class Bulletin:
         Returns the template_id of the newly created template.
         """
         self.logger.info(f"Adding template for {user_id}: {todo_content}")
-        with self.db as conn:
-            cur = conn.cursor()
+        with self.vault.transaction() as cur:
             cur.execute(
                 "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
                 (user_id, todo_content, cron, ddl_offset, run_once),
             )
-            return cur.lastrowid  # template_id
+            template_id = cur.lastrowid
+            self.logger.info(f"Added template {template_id} for {user_id}")
+        return template_id
 
-    def db_content(self):
+    def fetch_all(self):
         """
-        Return string representation of all tables for debugging.
+        Return dictionary of all tables and their rows.
         """
-        return self.db.full_content()
+        self.logger.info(f"[QUERY] Fetching all data from all tables")
+        all_data = {}
+        with self.vault.transaction() as cur:
+            # get list of tables
+            tables = cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            for table in tables:
+                table_name = table["name"]
+                rows = cur.execute(f"SELECT * FROM {table_name}").fetchall()
+                all_data[table_name] = [dict(row) for row in rows]
+        return all_data
+
 
     def get_templates(self):
         """get all todo templates"""
         self.logger.info(f"[QUERY] Getting all todo templates")
-        try:
-            with self.db as conn:
-                cur = conn.cursor()
-                cur.execute(
-                    """
+        with self.vault.transaction() as cur:
+            return cur.execute(
+                """
                     SELECT 
                         template_id,
                         user_id,
-                        todo_content,
-                        cron,
-                        ddl_offset,
-                        is_active,
-                        run_once,
-                        created_at
-                    FROM todo_templates
-                    ORDER BY template_id
-                    """
-                )
+                    todo_content,
+                    cron,
+                    ddl_offset,
+                    is_active,
+                    run_once,
+                    created_at
+                FROM todo_templates
+                ORDER BY template_id
+            """
+            ).fetchall()
 
-                results = cur.fetchall()
-                return results
-        except sqlite3.Error as e:
-            self.logger.info(f"ERROR querying todo templates: {e}")
-            return []
-
-    def get_todos(self, query_date: datetime.date | str = None):
+    def get_todos(self, query_date: date | str = None):
         """get todos for a specific date (YYYY-MM-DD) or all if None"""
         if query_date and isinstance(query_date, str):
-            query_date = datetime.date.fromisoformat(query_date).date()
+            query_date = date.fromisoformat(query_date).date()
         self.logger.info(f"[QUERY] Getting todos for reminder date: {query_date}")
-        try:
-            with self.db as conn:
-                cur = conn.cursor()
-                if query_date:
-                    date_str = query_date.isoformat()
-                    cur.execute(
-                        """
+        with self.vault.transaction() as cur:
+            if query_date:
+                return cur.execute(
+                    """
+                            SELECT 
+                                td.todo_id, 
+                                t.template_id,
+                                t.todo_content, 
+                                td.user_id, 
+                                td.status, 
+                                td.remind_time, 
+                                td.ddl_time
+                            FROM todos td
+                            JOIN todo_templates t ON td.template_id = t.template_id
+                            WHERE DATE(td.remind_time) = ?
+                            ORDER BY td.remind_time
+                            """,
+                    (query_date.isoformat(),),
+                ).fetchall()
+            else:
+                return cur.execute(
+                    """
+                            SELECT 
+                                td.todo_id,
+                                t.template_id,
+                                t.todo_content, 
+                                td.user_id,
+                                td.remind_time,
+                                td.ddl_time,
+                                td.status,
+                                td.created_at,
+                                td.updated_at
+                            FROM todos td
+                            JOIN todo_templates t ON td.template_id = t.template_id
+                            ORDER BY td.remind_time
+                            """
+                ).fetchall()
+
+    def get_todo(self, todo_id: int):
+        """get a specific todo by todo_id"""
+        self.logger.info(f"[QUERY] Getting Todo {todo_id}")
+        with self.vault.transaction() as cur:
+            return cur.execute(
+                """
                         SELECT 
                             td.todo_id, 
-                            t.template_id,
                             t.todo_content, 
                             td.user_id, 
-                            td.status, 
-                            td.reminder_time, 
-                            td.ddl_time
-                        FROM todos td
-                        JOIN todo_templates t ON td.template_id = t.template_id
-                        WHERE DATE(td.reminder_time) = ?
-                        ORDER BY td.reminder_time
-                        """,
-                        (date_str,),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT 
-                            td.todo_id,
-                            t.template_id,
-                            t.todo_content, 
-                            td.user_id, 
-                            td.reminder_time,
+                            td.remind_time, 
                             td.ddl_time,
                             td.status,
                             td.created_at,
                             td.updated_at
                         FROM todos td
                         JOIN todo_templates t ON td.template_id = t.template_id
-                        ORDER BY td.reminder_time
-                        """
-                    )
+                        WHERE td.todo_id = ?
+                        """,
+                (todo_id,),
+            ).fetchone()
 
-                results = cur.fetchall()
-                return results
-        except sqlite3.Error as e:
-            self.logger.info(f"ERROR querying todos: {e}")
-            return []
-
-    def get_todo(self, todo_id: int):
-        """get a specific todo by todo_id"""
-        try:
-            with self.db as conn:
-                cur = conn.cursor()
-                cur.execute(
-                    """
+    def get_todo_log(self, todo_id: int):
+        """get the status change log for a specific todo"""
+        self.logger.info(f"[QUERY] Getting status log for Todo {todo_id}")
+        with self.vault.transaction() as cur:
+            return cur.execute(
+                """
                     SELECT 
-                        td.todo_id, 
-                        t.todo_content, 
-                        td.user_id, 
-                        td.reminder_time, 
-                        td.ddl_time,
-                        td.status,
-                        td.created_at,
-                        td.updated_at
-                    FROM todos td
-                    JOIN todo_templates t ON td.template_id = t.template_id
-                    WHERE td.todo_id = ?
-                    """,
-                    (todo_id,),
-                )
-                result = cur.fetchone()
-                return result
-
-        except sqlite3.Error as e:
-            self.logger.info(f"ERROR querying todo {todo_id}: {e}")
-            return None
+                        log_id,
+                        todo_id,
+                    old_status,
+                    new_status,
+                    changed_at
+                FROM todo_status_logs
+                WHERE todo_id = ?
+                ORDER BY changed_at
+            """,
+                (todo_id,),
+            ).fetchall()

@@ -4,8 +4,9 @@ import logging
 from .utils.config import setup_global_logger
 
 from .task.engine_launcher import launch_engine_scheduler
-from .slack.reminder_launcher import launch_reminder_scheduler
+from .slack.patrol_launcher import launch_patrol_scheduler
 from .slack.app import socket_mode_handler
+
 # register
 from .extra.flask_app import flask_app
 
@@ -15,8 +16,6 @@ from .extra import dev
 _ = dev  # to avoid unused import warning
 
 if __name__ == "__main__":
-    assert os.environ.get("SLACK_APP_TOKEN") is not None, "SLACK_APP_TOKEN is required!"
-
     setup_global_logger(log_file_name="alfred.log")
     logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     #     sys.exit(1)
 
     launch_engine_scheduler()
-    launch_reminder_scheduler()
+    launch_patrol_scheduler()
 
     socket_mode_handler.connect()  # Keep the Socket Mode client running but non-blocking
     flask_app.run(port=10443)

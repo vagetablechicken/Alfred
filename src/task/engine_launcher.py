@@ -2,13 +2,12 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 
-from .task_engine import task_engine
+from . import task_engine
 
 
 def task_engine_job():
     current_time = datetime.now()
-    task_engine.run_scheduler(current_time)
-    task_engine.run_escalator(current_time)
+    task_engine.instance.run_scheduler(current_time)
 
 
 def launch_engine_scheduler(seconds: int = 60) -> bool:

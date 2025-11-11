@@ -8,13 +8,13 @@ def gen_todo_desc(task_engine, todo_id):
 
     todo_content = todo[1]
     status = todo[4]
-    reminder_time = todo[2]
+    remind_time = todo[2]
     ddl_time = todo[3]
 
     desc = (
         f"*Task:* {todo_content}\n"
         f"*Status:* {status}\n"
-        f"*Reminder Time:* {reminder_time}\n"
+        f"*Reminder Time:* {remind_time}\n"
         f"*Deadline Time:* {ddl_time}\n"
     )
     return desc

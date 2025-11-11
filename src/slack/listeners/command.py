@@ -1,6 +1,6 @@
 import logging
 from ..app import app
-from ...task.task_engine import task_engine
+from ..butler import butler
 
 
 @app.command("/alfred")
@@ -55,30 +55,28 @@ def handle_add_template(args, user_id, logger, say):
     """Handle the command to add task template"""
     parts = args.split()
     if len(parts) < 4:
-        say("Usage: /alfred add template <user_id> <name> <cron> <ddl_offset> [<run_once>]")
+        say(
+            "Usage: /alfred add template <user_id> <name> <cron> <ddl_offset> [<run_once>]"
+        )
         return
 
-    target_user_id = parts[0]
+    user_id = parts[0]
     name = parts[1]
     cron = parts[2]
     ddl_offset = parts[3]
     run_once = int(parts[4]) if len(parts) > 4 else 0
 
-    template_id = task_engine.add_template(
-        target_user_id, name, cron, ddl_offset, run_once
-    )
-    logger.info(
-        f"User <@{user_id}> added template {template_id} for <@{target_user_id}>"
-    )
-    say(f"Template '{name}' added for <@{target_user_id}> with ID {template_id}.")
+    template_id = butler.add_template(user_id, name, cron, ddl_offset, run_once)
+    logger.info(f"User <@{user_id}> added template {template_id} for <@{user_id}>")
+    say(f"Template '{name}' added for <@{user_id}> with ID {template_id}.")
 
 
-def handle_list(args, user_id, logger: logging.Logger, say):
+def handle_list(args, user_id, logger, say):
     """Handle the command to list todos or templates"""
     list_type = args.lower() if args else "todos"
     if list_type == "todos":
         # admin may want to see all todos
-        todos = task_engine.get_todos()
+        todos = butler.get_todos()
         if not todos:
             say("No TODOs.")
             return
@@ -86,7 +84,7 @@ def handle_list(args, user_id, logger: logging.Logger, say):
         logger.debug(f"Listing todos: {todo_list}")
         say(f"*TODOs:*\n{todo_list}")
     elif list_type == "templates":
-        templates = task_engine.get_templates()
+        templates = butler.get_templates()
         if not templates:
             say("No task templates.")
             return
@@ -110,7 +108,7 @@ def handle_log(args, user_id, logger, say):
         return
 
     todo_id = parts[0]
-    todo_log = task_engine.get_todo_log(todo_id)
+    todo_log = butler.get_todo_log(todo_id)
     logger.debug(f"Fetched log for todo_id {todo_id}: {todo_log}")
     if not todo_log:
         say(f"No TODO found with ID {todo_id}.")
@@ -128,37 +126,9 @@ def generate_test_todo_block(user_id: str, logger: logging.Logger, say):
     """
     logger.info(f"User {user_id} triggered a Block Kit test.")
 
-    todo_id = 99999
-    section_block_id = f"todo_{todo_id}_section"
-    action_block_id = f"todo_{todo_id}_actions"
-    blocks = [
-        {
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": "*This is a todo item for testing:*"},
-        },
-        {"type": "divider"},
-        {
-            "type": "section",
-            "block_id": section_block_id,
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*[ID: {todo_id}]* `Test Task`\n*Status*: pending",
-            },
-        },
-        {
-            "type": "actions",
-            "block_id": action_block_id,
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {"type": "plain_text", "text": "✅ Log (Complete)"},
-                    "action_id": "log_todo_button",
-                    "value": str(todo_id),
-                    "style": "primary",
-                }
-            ],
-        },
-    ]
+    blocks = butler._build_single_todo_blocks(
+        {"todo_id": 9999, "content": "Test Task", "status": "pending"}
+    )
 
     # Send this Block Kit (default ephemeral)
     try:

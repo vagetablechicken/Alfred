@@ -1,32 +1,27 @@
 """简单的配置加载器"""
+
 import os
 import sys
 import yaml
 from pathlib import Path
 import logging
 
+logger = logging.getLogger(__name__)
 
-def _is_pytest_running():
+
+def _is_pytest_running() -> bool:
     """检测是否在 pytest 环境中运行"""
-    # 方法1: 检查 PYTEST_CURRENT_TEST 环境变量（pytest 设置）
-    if 'PYTEST_CURRENT_TEST' in os.environ:
-        return True
-    
-    # 方法2: 检查 sys.modules 中是否已导入 pytest
-    if 'pytest' in sys.modules:
-        return True
-    
-    # 方法3: 检查命令行参数
-    if any('pytest' in arg.lower() for arg in sys.argv):
-        return True
-    
-    return False
+    return (
+        "PYTEST_CURRENT_TEST" in os.environ
+        or "pytest" in sys.modules
+        or any("pytest" in arg.lower() for arg in sys.argv)
+    )
 
 
 def load_config(config_file: str = None):
     """
     加载配置文件
-    
+
     优先级:
     1. config_file 参数
     2. ALFRED_CONFIG 环境变量
@@ -35,41 +30,64 @@ def load_config(config_file: str = None):
     """
     if config_file is None:
         # 检查环境变量
-        config_file = os.getenv('ALFRED_CONFIG')
-        
+        config_file = os.getenv("ALFRED_CONFIG")
+
         if config_file is None:
             # pytest 运行时自动使用测试配置
             if _is_pytest_running():
-                config_file = 'config.test.yaml'
+                config_file = "config.test.yaml"
             else:
-                config_file = 'config.yaml'
-    
+                config_file = "config.yaml"
+            logger.info(f"No config file specified, using default: {config_file}")
+        else:
+            logger.info(f"Using config file from ALFRED_CONFIG: {config_file}")
+
     # 找到项目根目录
     project_root = Path(__file__).parent.parent.parent
     config_path = project_root / config_file
-    
+
     if not config_path.exists():
-        # 如果配置文件不存在，返回默认配置
-        return {
-            'database': {'path': 'tasks.db'},
-            'logging': {'level': 'INFO'}
-        }
-    
-    with open(config_path, 'r', encoding='utf-8') as f:
+        logger.warning(f"Config file {config_path} does not exist. Using empty config.")
+        return {}
+
+    with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
-def get_db_path(config_file: str = None) -> str:
-    """获取数据库路径"""
+def get_vault_path(config_file: str = None) -> str:
     config = load_config(config_file)
-    db_path = config.get('database', {}).get('path', 'tasks.db')
-    
+    db_path = config.get("vault", {}).get("path", "")
+    if not db_path:
+        raise ValueError("Vault database path not configured.")
     # 如果是相对路径且不是内存数据库，转为绝对路径
-    if not os.path.isabs(db_path) and db_path != ':memory:':
+    if not os.path.isabs(db_path) and db_path != ":memory:":
         project_root = Path(__file__).parent.parent.parent
         db_path = str(project_root / db_path)
-    
+
     return db_path
+
+
+def get_init_sql(config_file: str = None) -> str:
+    config = load_config(config_file)
+    # use default init sql if not specified, relative to root
+    init_sql = config.get("vault", {}).get("init_sql", "src/task/vault/sqlite_init.sql")
+
+    # 如果是相对路径，转为绝对路径
+    if not os.path.isabs(init_sql):
+        project_root = Path(__file__).parent.parent.parent
+        init_sql = str(project_root / init_sql)
+
+    # read yaml file content
+    with open(init_sql, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def get_slack_channel(config_file: str = None) -> str:
+    """read file every time to get update"""
+    config = load_config(config_file)
+    # can't be None here, must be set in config
+    channel = config.get("slack").get("channel")
+    return channel
 
 
 def setup_global_logger(
