@@ -3,7 +3,7 @@ import sqlite3
 import threading
 import logging
 
-from utils.config import get_vault_path, get_init_sql
+from alfred.utils.config import get_vault_path, get_init_sql
 
 logger = logging.getLogger(__name__)
 

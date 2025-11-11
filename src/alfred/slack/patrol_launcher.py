@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def patrol_job():
     # read from engine, if tasks are due, send reminders
-    with butler.gather_blocks() as blocks:
+    with butler.gather_notify_blocks() as blocks:
         if not blocks:
             # nothing to notify
             return

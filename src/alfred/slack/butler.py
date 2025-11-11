@@ -23,18 +23,24 @@ class Butler:
         todos_today = self.bulletin.get_todos(current_time.date())
 
         # filter overdue tasks, some todos have already been reminded, skip those
-        normal_todos = [
-            todo
-            for todo in todos_today
-            if todo["remind_time"] <= current_time < todo["ddl_time"]
-            and todo["id"] not in self.sent_notifies["normal"]
-        ]
-        overdue_todos = [
-            todo
-            for todo in todos_today
-            if todo["ddl_time"] <= current_time
-            and todo["id"] not in self.sent_notifies["overdue"]
-        ]
+        def need_normal_remind(todo):
+            # todo times are str
+            remind_time = datetime.fromisoformat(todo["remind_time"])
+            ddl_time = datetime.fromisoformat(todo["ddl_time"])
+            return (
+                remind_time <= current_time < ddl_time
+                and todo["todo_id"] not in self.sent_notifies["normal"]
+            )
+
+        def need_overdue_remind(todo):
+            ddl_time = datetime.fromisoformat(todo["ddl_time"])
+            return (
+                ddl_time <= current_time
+                and todo["todo_id"] not in self.sent_notifies["overdue"]
+            )
+
+        normal_todos = [todo for todo in todos_today if need_normal_remind(todo)]
+        overdue_todos = [todo for todo in todos_today if need_overdue_remind(todo)]
         # build blocks
         blocks = self._build_blocks(normal_todos, overdue_todos)
         try:
@@ -46,9 +52,9 @@ class Butler:
             self.logger.info("[Butler] Successfully sent, update status.")
             # mark reminders as sent
             for todo in normal_todos:
-                self.sent_notifies["normal"].add(todo["id"])
+                self.sent_notifies["normal"].add(todo["todo_id"])
             for todo in overdue_todos:
-                self.sent_notifies["overdue"].add(todo["id"])
+                self.sent_notifies["overdue"].add(todo["todo_id"])
             self.logger.debug(f"[Butler] Updated sent_notifies: {self.sent_notifies}")
 
     @contextmanager
@@ -87,12 +93,15 @@ class Butler:
     def _build_blocks(self, normal_todos, overdue_todos):
         """interactive block building"""
         blocks = []
+        # if both empty, return empty
+        if not normal_todos and not overdue_todos:
+            return blocks
 
         # 1. 添加一个固定的主标题
         blocks.append(
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": "🔔 您的待办事项提醒"},
+                "text": {"type": "plain_text", "text": "🔔 待办事项提醒"},
             }
         )
 
@@ -151,6 +160,7 @@ class Butler:
         """
         # 从 todo 对象中提取信息
         todo_id = todo["todo_id"]
+        user_id = todo["user_id"]
         todo_content = todo["todo_content"]
         status = todo["status"]
 
@@ -165,7 +175,7 @@ class Butler:
             "block_id": section_block_id,
             "text": {
                 "type": "mrkdwn",
-                "text": f"*[ID: {todo_id}]* `{todo_content}`\n*Status*: {status}",
+                "text": f"*[ID: {todo_id}]* <@{user_id}> `{todo_content}` *Status*: {status}",
             },
         }
         if status == "revoked":
@@ -228,7 +238,7 @@ class Butler:
     def add_template(self, user_id, name, cron, ddl_offset, run_once):
         return self.bulletin.add_template(user_id, name, cron, ddl_offset, run_once)
 
-    def get_todos(self, for_date):
+    def get_todos(self, for_date = None):
         return self.bulletin.get_todos(for_date)
 
     def get_templates(self):

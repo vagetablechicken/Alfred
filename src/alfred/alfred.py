@@ -6,6 +6,7 @@ from .utils.config import setup_global_logger
 from .task.engine_launcher import launch_engine_scheduler
 from .slack.patrol_launcher import launch_patrol_scheduler
 from .slack.app import socket_mode_handler
+from .slack import listeners
 
 # register
 from .extra.flask_app import flask_app
@@ -15,9 +16,9 @@ from .extra import dev
 
 _ = dev  # to avoid unused import warning
 
-if __name__ == "__main__":
+
+def alfred_in():
     setup_global_logger(log_file_name="alfred.log")
-    logger = logging.getLogger(__name__)
 
     # if you need the bot user ID for any reason, try this
     # try:
@@ -36,3 +37,7 @@ if __name__ == "__main__":
 
     socket_mode_handler.connect()  # Keep the Socket Mode client running but non-blocking
     flask_app.run(port=10443)
+
+
+if __name__ == "__main__":
+    alfred_in()

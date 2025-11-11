@@ -5,3 +5,5 @@ croniter
 apscheduler
 pytest
 pyyaml
+shlex
+typer[all]

@@ -23,8 +23,8 @@ class Bulletin:
             with self.vault.transaction() as cur:
                 result = cur.execute(
                     "SELECT status FROM todos WHERE todo_id = ?", (todo_id,)
-                )
-                old_status = result[0]
+                ).fetchone()
+                old_status = result['status'] if result else None
                 if old_status in ("completed", "revoked"):
                     self.logger.info(
                         f"Todo {todo_id} is already in a final state ({old_status})."

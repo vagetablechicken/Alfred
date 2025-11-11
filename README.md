@@ -47,18 +47,23 @@ export ALFRED_CONFIG=config.custom.yaml
 
 ### 3. 运行
 
+先editable安装：
 ```bash
-# Linux or macOS
+pip install -e .
+```
+
+配置Slack Token环境变量并运行Alfred：
+```bash
 export SLACK_BOT_TOKEN="xoxb-your-slack-bot-token"
 export SLACK_APP_TOKEN="xapp-your-slack-app-token"
-python -m src.alfred
+alfred
 ```
 
 ```powershell
 # Windows
 $env:SLACK_BOT_TOKEN="xoxb-your-slack-bot-token"
 $env:SLACK_APP_TOKEN="xapp-your-slack-app-token"
-python -m src.alfred
+alfred
 ```
 
 ### 4. 测试

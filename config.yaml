@@ -1,10 +1,10 @@
 # Alfred production environment configuration
 vault:
   path: "prod.db" # Database file path (relative to project root)
-  init_sql: "" # if empty, use default init sql
+  # init_sql: "" # if not set, use default init sql file
 
 logging:
-  level: "INFO"
+  level: "DEBUG"  # "INFO"
 
 scheduler:
   interval_seconds: 60

@@ -36,7 +36,7 @@ def handle_mark_todo_complete(ack, body, client, logger):
         # generate from todo id, more clear
         completed_blocks = butler.build_single_todo_blocks(todo_id)
 
-        # 5. 在原始 blocks 列表中替换掉旧的 blocks
+        # TODO: 替换有问题
         new_blocks = []
         for block in original_blocks:
             # TODO: 依赖顺序可能不太好，考虑用 block_id 来匹配
@@ -56,7 +56,7 @@ def handle_mark_todo_complete(ack, body, client, logger):
         )
 
     except Exception as e:
-        logger.error(f"Failed to log todo via button: {e}")
+        logger.exception(f"Failed to log todo via button")
         # (出错时也应该通知用户)
         client.chat_postEphemeral(
             channel=channel_id, user=user_id, text=f"❌ *记录失败*:\n`{e}`"
