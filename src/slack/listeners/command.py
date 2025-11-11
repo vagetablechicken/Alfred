@@ -55,17 +55,17 @@ def handle_add_template(args, user_id, logger, say):
     """Handle the command to add task template"""
     parts = args.split()
     if len(parts) < 4:
-        say("Usage: /alfred add template <user_id> <name> <cron> <bias> [<run_once>]")
+        say("Usage: /alfred add template <user_id> <name> <cron> <ddl_offset> [<run_once>]")
         return
 
     target_user_id = parts[0]
     name = parts[1]
     cron = parts[2]
-    bias = parts[3]
+    ddl_offset = parts[3]
     run_once = int(parts[4]) if len(parts) > 4 else 0
 
-    template_id = task_engine.add_task_template(
-        target_user_id, name, cron, bias, run_once
+    template_id = task_engine.add_template(
+        target_user_id, name, cron, ddl_offset, run_once
     )
     logger.info(
         f"User <@{user_id}> added template {template_id} for <@{target_user_id}>"
@@ -86,7 +86,7 @@ def handle_list(args, user_id, logger: logging.Logger, say):
         logger.debug(f"Listing todos: {todo_list}")
         say(f"*TODOs:*\n{todo_list}")
     elif list_type == "templates":
-        templates = task_engine.get_task_templates()
+        templates = task_engine.get_templates()
         if not templates:
             say("No task templates.")
             return

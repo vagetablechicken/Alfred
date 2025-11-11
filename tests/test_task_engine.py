@@ -1,8 +1,6 @@
-import datetime
 import pytest
 
 from task import task_engine
-from task.database.database_manager import DatabaseManager
 
 
 class DummyCron:
@@ -16,19 +14,13 @@ class DummyCron:
 
 
 @pytest.fixture
-def mock_engine(tmp_path, monkeypatch):
-    # use origin init.sql but db file in tmp_path
-    tmp_db_file = tmp_path / "test_tasks.db"
-    database_manager = DatabaseManager(tmp_db_file)
-    database_manager.create_tables()
-
+def mock_engine(monkeypatch):
     # monkeypatch the imported 'croniter' in task engine to use DummyCron
     def croniter_stub(cron_expr, current_time):
         return DummyCron(current_time)
 
-    te = task_engine.TaskEngine(database_manager)
     monkeypatch.setattr(task_engine, "croniter", croniter_stub)
-    return te
+    return task_engine.task_engine
 
 
 def test_get_todo_methods(mock_engine):

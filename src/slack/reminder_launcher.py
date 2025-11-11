@@ -18,7 +18,7 @@ def reminder_job():
     # TODO: send reminders via Slack API
 
 
-def launch_engine_scheduler():
+def launch_reminder_scheduler(seconds: int = 60) -> bool:
     # only 1 worker thread
     executors = {"default": ThreadPoolExecutor(max_workers=1)}
 
@@ -28,7 +28,7 @@ def launch_engine_scheduler():
         scheduler.add_job(
             func=reminder_job,
             trigger="interval",
-            seconds=60,  # run every minute
+            seconds=seconds,  # default every 60 seconds, if in testing can set to smaller value
             id="reminder_job",
             replace_existing=True,
             misfire_grace_time=60,

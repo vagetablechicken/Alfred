@@ -1,0 +1,10 @@
+# Alfred 生产环境配置
+database:
+  path: "tasks.db"  # 数据库文件路径（相对于项目根目录）
+
+logging:
+  level: "INFO"
+
+scheduler:
+  interval_seconds: 60
+  escalator_interval_seconds: 300

@@ -4,3 +4,4 @@ flask
 croniter
 apscheduler
 pytest
+pyyaml

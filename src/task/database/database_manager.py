@@ -3,7 +3,7 @@ import os
 import logging
 
 
-class DatabaseManager:
+class DBSession:
     """
     A simple wrapper for SQLite database connections and operations.
     - Automatically handles opening and closing the connection.
@@ -79,3 +79,4 @@ class DatabaseManager:
                 content[table] = [dict(row) for row in rows]
 
         return content
+
