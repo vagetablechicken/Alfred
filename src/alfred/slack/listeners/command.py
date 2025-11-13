@@ -41,15 +41,11 @@ def handle_alfred_command(ack, body, client, logger, say):
         # Typer 默认在 --help 或出错时会退出程序
         if e.code == 0:
             logger.info("\n--- Typer 帮助信息 (已捕获) ---")
-            say(
-                "```"
-                + alfred_cli_app.get_help(ctx=typer.Context(alfred_cli_app))
-                + "```"
-            )
+            # normal exit
         else:
             logger.info("\n--- Typer 参数错误 (已捕获) ---")
             logger.info("  (Tip: 可能是缺少了必需的参数)")
-            say(f"❌ *参数错误*:\n`请检查您的命令格式或使用 --help 获取帮助`")
+            say(f"❌ *参数错误*:\n`请检查您的命令格式或使用 /alfred help 获取帮助`")
     except Exception as e:
         logger.exception(f"Unknown error: {e}")
         say(f"❌ *发生错误*:\n`{e}`")
@@ -98,8 +94,8 @@ class ListCategory(str, enum.Enum):
     templates = "templates"
 
 
-alfred_cli_app = typer.Typer(
-    help=(
+def help_string():
+    return (
         "*Alfred Bot Command Help:*\n"
         "• `/alfred add template <user_id> <name> <cron> <offset> [<run_once>]`\n"
         "  run_once is optional, 1 = run once then disable, 0 = run periodically, default is 0\n"
@@ -107,8 +103,16 @@ alfred_cli_app = typer.Typer(
         "• `/alfred list [todos|templates]`\n"
         "  (Default is `todos`)\n"
         "• `/alfred log <todo_id>`\n"
-        "  (Mark your todo as 'completed')"
-    ),
+        "  (Show log for a specific todo ID)\n"
+        "• `/alfred test`\n"
+        "  (Send a test Block Kit message)\n"
+        "• `/alfred help`\n"
+        "  (Show this help information)\n"
+    )
+
+
+alfred_cli_app = typer.Typer(
+    help=help_string(),
     add_completion=False,  # slack bot can't use shell completion
 )
 
@@ -184,11 +188,11 @@ def list_items(
 
 # --- 3.3. 'log' 命令 ---
 @alfred_cli_app.command(
-    "log", help="• /alfred log <todo_id> (Mark your todo as 'completed')"
+    "log", help="• /alfred log <todo_id> (Show log for a specific todo ID)"
 )
 def log_todo(
     ctx: typer.Context,
-    todo_id: str = typer.Argument(..., help="要标记为'完成'的 todo ID"),
+    todo_id: str = typer.Argument(..., help="要查看日志的 TODO ID"),
 ):
     """
     标记一个 todo 为 'completed'.
@@ -233,3 +237,15 @@ def test_send(ctx: typer.Context):
     except Exception as e:
         logger.exception(f"Error posting TEST block kit")
         say(f"An error occurred while sending the test message: {e}")
+
+
+@alfred_cli_app.command("help", help="Show help information")
+def show_help(ctx: typer.Context):
+    """
+    Show help information.
+    """
+    logger = ctx.obj.logger
+    say = ctx.obj.say
+    logger.info("Showing help information...")
+    help_text = help_string()
+    say(f"*Alfred Bot Command Help:*\n```{help_text}```")
