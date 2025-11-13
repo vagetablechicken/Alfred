@@ -45,10 +45,12 @@ class Butler:
         blocks = self._build_blocks(normal_todos, overdue_todos)
         try:
             yield blocks
-
         except Exception as e:
             self.logger.error(f"[Butler] ERROR sending blocks: {e}")
         else:
+            if not blocks:
+                self.logger.debug("[Butler] No new notifications to send.")
+                return
             self.logger.info("[Butler] Successfully sent, update status.")
             # mark reminders as sent
             for todo in normal_todos:
@@ -83,12 +85,14 @@ class Butler:
         except Exception as e:
             self.logger.error(f"[Butler] ERROR sending end-of-day summary: {e}")
         else:
+            if not blocks:
+                self.logger.debug("[Butler] No end-of-day summary to send.")
+                return
             self.logger.info("[Butler] Successfully sent end-of-day summary.")
-            if blocks:
-                self.sent_summaries.add(current_time.date())
-                self.logger.debug(
-                    f"[Butler] Updated sent_summaries: {self.sent_summaries}"
-                )
+            self.sent_summaries.add(current_time.date())
+            self.logger.debug(
+                f"[Butler] Updated sent_summaries: {self.sent_summaries}"
+            )
 
     def _build_blocks(self, normal_todos, overdue_todos):
         """interactive block building"""

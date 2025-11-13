@@ -24,7 +24,7 @@ def handle_alfred_command(ack, body, client, logger, say):
     text = body.get("text", "").strip()
     logger.info(f"User {user_id} triggered /alfred with: {text}")
 
-    if admin_list := get_slack_admin() and user_id not in admin_list:
+    if (admin_list := get_slack_admin()) and (user_id not in admin_list):
         say("❌ *Permission Denied*: You are not an admin.")
         logger.warning(f"User {user_id} is not an admin. Permission denied.")
         return
