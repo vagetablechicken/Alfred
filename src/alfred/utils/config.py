@@ -63,12 +63,11 @@ def get_vault_path(config_file: str = None) -> str:
 def get_init_sql(config_file: str = None) -> str:
     config = load_config(config_file)
     # use default init sql if not specified
-    init_sql = config.get("vault", {}).get("init_sql", "task/vault/sqlite_init.sql")
-
-    # 如果是相对路径，转为绝对路径
-    if not os.path.isabs(init_sql):
+    init_sql = config.get("vault", {}).get("init_sql", "")
+    # if empty, use default
+    if not init_sql:
         project_root = Path(__file__).parent.parent
-        init_sql = str(project_root / init_sql)
+        init_sql = str(project_root / "task/vault/sqlite_init.sql")
 
     # read yaml file content
     with open(init_sql, "r", encoding="utf-8") as f:

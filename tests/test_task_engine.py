@@ -1,7 +1,7 @@
 import pytest
 
-from task import vault, task_engine
-from task.bulletin import Bulletin
+from alfred.task import task_engine
+from alfred.task.bulletin import Bulletin
 
 
 class DummyCron:

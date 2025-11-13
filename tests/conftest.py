@@ -2,18 +2,29 @@
 
 import sys
 import os
-from pathlib import Path
-
+from unittest.mock import MagicMock
 import pytest
 
-# Ensure the project's source directory is on sys.path so tests can import
-# modules as they expect (e.g. `from task.bulletin import Bulletin`).
-ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src" / "alfred"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+from alfred.task.vault import LockedSqliteVault
 
-from task.vault import LockedSqliteVault
+# Set required Slack environment variables for testing
+# These must be set before importing any alfred modules
+os.environ.setdefault("SLACK_BOT_TOKEN", "xoxb-test-token")
+os.environ.setdefault("SLACK_APP_TOKEN", "xapp-test-token")
+
+# Create a mock App class that doesn't validate tokens
+class MockApp:
+    def __init__(self, *args, **kwargs):
+        self.client = MagicMock()
+        self.client.chat_postMessage = MagicMock(return_value={"ok": True})
+        
+mock_slack_bolt = MagicMock()
+mock_slack_bolt.App = MockApp
+sys.modules['slack_bolt'] = mock_slack_bolt
+sys.modules['slack_bolt.adapter'] = MagicMock()
+sys.modules['slack_bolt.adapter.socket_mode'] = MagicMock()
+
+
 
 
 @pytest.fixture(autouse=True)
@@ -27,4 +38,4 @@ def mock_vault():
         cur.execute("DELETE FROM todo_templates")
         cur.execute("DELETE FROM todo_status_logs")
 
-    yield
+    yield vault

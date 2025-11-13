@@ -1,5 +1,5 @@
-from task.bulletin import Bulletin
-from task.engine_launcher import launch_engine_scheduler
+from alfred.task.bulletin import Bulletin
+from alfred.task.engine_launcher import launch_engine_scheduler
 
 import time
 
@@ -20,4 +20,3 @@ def test_task_runs_in_background_and_completes():
     # at least one task should be created
     todos = bulletin.get_todos()
     assert any(todo["template_id"] == template_id for todo in todos)
-

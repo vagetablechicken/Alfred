@@ -29,7 +29,8 @@ pytest  # 自动使用 config.test.yaml
 
 **生产环境运行自动使用生产配置:**
 ```bash
-python -m src.alfred  # 自动使用 config.yaml
+pip install -e .
+alfred  # 自动使用 config.yaml
 ```
 
 ## 手动指定配置
@@ -39,17 +40,17 @@ python -m src.alfred  # 自动使用 config.yaml
 ```bash
 # Linux/macOS
 export ALFRED_CONFIG=config.custom.yaml
-python -m src.alfred
+alfred
 
 # Windows PowerShell
 $env:ALFRED_CONFIG="config.custom.yaml"
-python -m src.alfred
+alfred
 ```
 
 ## 在代码中使用
 
 ```python
-from utils.config import get_db_path, load_config
+from alfred.utils.config import get_db_path, load_config
 
 # 获取数据库路径（自动根据环境选择配置）
 db_path = get_db_path()
@@ -61,31 +62,38 @@ db_path = get_db_path('config.test.yaml')
 config = load_config()
 ```
 
-## 测试中的使用
-
-如需在测试中使用自定义数据库：
-
-```python
-@pytest.fixture
-def custom_engine(tmp_path):
-    from task.task_engine import TaskEngine
-    ...
-```
-
 ## 配置项说明
 
-### database.path
+### vault.path
 - **类型**: string
 - **说明**: 数据库文件路径
 - **值**:
-  - 相对路径（如 `"tasks.db"`）：相对于项目根目录
+  - 相对路径（如 `"tasks.db"`）：相对于运行目录
   - 绝对路径（如 `"C:/data/tasks.db"`）
   - 不建议使用`:memory:`，大部分的测试都是临时创建connection。
+
+### vault.init_sql
+- **类型**: string
+- **说明**: 初始化数据库的 SQL 脚本路径
+- **默认**: 代码内置默认脚本
+- **值**:
+  - 相对路径（如 `"init.sql"`）：相对于运行目录
+  - 绝对路径（如 `"/path/to/init.sql"`）
 
 ### logging.level
 - **类型**: string
 - **选项**: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - **默认**: INFO
+
+### slack.channel
+- **类型**: string
+- **说明**: Slack 通知频道名称
+- **值**: 频道ID
+
+### slack.admin
+- **类型**: list of strings
+- **说明**: Slack 管理员用户ID列表
+- **值**: 用户ID列表
 
 ## 环境变量
 

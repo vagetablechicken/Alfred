@@ -84,4 +84,3 @@ def test_revert_todo_completion_sets_pending_and_logs():
 	logs = bulletin.get_todo_log(todo_id)
 	assert logs[-1]["new_status"] == "pending"
 	assert logs[-1]["old_status"] == "completed"
-
