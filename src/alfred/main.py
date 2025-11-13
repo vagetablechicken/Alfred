@@ -34,9 +34,10 @@ def alfred_in():
     #         "Please check SLACK_BOT_TOKEN and bot permissions (auth:test scope)."
     #     )
     #     sys.exit(1)
-
-    launch_engine_scheduler()
-    launch_patrol_scheduler()
+    engine_interval = config.get("scheduler", {}).get("engine_interval_seconds", 60)
+    patrol_interval = config.get("scheduler", {}).get("patrol_interval_seconds", 60)
+    launch_engine_scheduler(seconds=engine_interval)
+    launch_patrol_scheduler(seconds=patrol_interval)
 
     socket_mode_handler.connect()  # Keep the Socket Mode client running but non-blocking
     flask_app.run(port=10443)

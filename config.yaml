@@ -9,8 +9,8 @@ logging:
   log_file: "alfred.log"
 
 scheduler:
-  interval_seconds: 60
-  escalator_interval_seconds: 300
+  patrol_interval_seconds: 60
+  engine_interval_seconds: 60
 
 slack:
   channel: ""
