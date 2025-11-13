@@ -1,4 +1,4 @@
-from alfred.utils.config import setup_global_logger
+from alfred.utils.config import load_config, setup_global_logger
 
 from alfred.task.engine_launcher import launch_engine_scheduler
 from alfred.slack.patrol_launcher import launch_patrol_scheduler
@@ -16,7 +16,12 @@ _ = dev  # to avoid unused import warning
 
 
 def alfred_in():
-    setup_global_logger(log_file_name="alfred.log")
+    config = load_config()
+    logging_config = config.get("logging", {})
+    console_level = logging_config.get("console_level", "INFO").upper()
+    file_level = logging_config.get("file_level", "DEBUG").upper()
+    log_file = config.get("log_file", "alfred.log")
+    setup_global_logger(console_level=console_level, file_level=file_level, log_file_name=log_file)
 
     # if you need the bot user ID for any reason, try this
     # try:

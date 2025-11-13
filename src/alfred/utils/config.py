@@ -82,6 +82,7 @@ def get_slack_channel(config_file: str = None) -> str:
     channel = config.get("slack").get("channel")
     return channel
 
+
 def get_slack_admin(config_file: str = None) -> str:
     """read file every time to get update"""
     config = load_config(config_file)
@@ -90,20 +91,12 @@ def get_slack_admin(config_file: str = None) -> str:
     assert isinstance(admin, list), "Slack admin config must be a list of user IDs"
     return admin
 
+
 def setup_global_logger(
-    console_level=logging.INFO, file_level=logging.DEBUG, log_file_name="app.log"
+    console_level="INFO", file_level="DEBUG", log_file_name="alfred.log"
 ):
     """
-    配置一个简单、可重用的全局日志记录器。
-
-    它会同时将日志输出到：
-    1. 控制台 (StreamHandler)
-    2. 日志文件 (FileHandler)
-
-    参数:
-    console_level (int): 控制台输出的最低日志级别 (默认: INFO)
-    file_level (int): 文件输出的最低日志级别 (默认: DEBUG)
-    log_file_name (str): 日志文件的名称 (默认: app.log)
+    Set up a global logger with both console and file handlers.
     """
 
     # 1. 获取根记录器 (root logger)

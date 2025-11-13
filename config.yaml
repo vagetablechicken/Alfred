@@ -4,7 +4,9 @@ vault:
   # init_sql: "" # if not set, use default init sql file
 
 logging:
-  level: "DEBUG" # "INFO"
+  console_level: "INFO"
+  file_level: "DEBUG"
+  log_file: "alfred.log"
 
 scheduler:
   interval_seconds: 60
