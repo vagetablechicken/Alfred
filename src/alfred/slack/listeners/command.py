@@ -1,9 +1,10 @@
 import enum
-import logging
 from croniter import croniter
 import re
 import typer
 import shlex
+
+from alfred.utils.config import get_slack_admin
 
 from ..app import app
 from ..butler import butler
@@ -22,6 +23,11 @@ def handle_alfred_command(ack, body, client, logger, say):
     # text is no /alfred prefix
     text = body.get("text", "").strip()
     logger.info(f"User {user_id} triggered /alfred with: {text}")
+
+    if admin_list := get_slack_admin() and user_id not in admin_list:
+        say("❌ *Permission Denied*: You are not an admin.")
+        logger.warning(f"User {user_id} is not an admin. Permission denied.")
+        return
 
     try:
         args_list = shlex.split(text)

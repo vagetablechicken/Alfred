@@ -12,3 +12,5 @@ scheduler:
 
 slack:
   channel: ""
+  admin:
+    - ""

@@ -82,6 +82,13 @@ def get_slack_channel(config_file: str = None) -> str:
     channel = config.get("slack").get("channel")
     return channel
 
+def get_slack_admin(config_file: str = None) -> str:
+    """read file every time to get update"""
+    config = load_config(config_file)
+    # can't be None here, must be set in config
+    admin = config.get("slack").get("admin")
+    assert isinstance(admin, list), "Slack admin config must be a list of user IDs"
+    return admin
 
 def setup_global_logger(
     console_level=logging.INFO, file_level=logging.DEBUG, log_file_name="app.log"
