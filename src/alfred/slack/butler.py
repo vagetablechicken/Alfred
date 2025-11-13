@@ -122,7 +122,7 @@ class Butler:
             blocks.append(
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "_太好了! 没有逾期的任务。_"},
+                    "text": {"type": "mrkdwn", "text": "_已逾期任务不重复提醒_"},
                 }
             )
         else:
@@ -143,7 +143,7 @@ class Butler:
             blocks.append(
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "_所有任务都已清空!_"},
+                    "text": {"type": "mrkdwn", "text": "_已提醒任务不重复提醒_"},
                 }
             )
         else:
