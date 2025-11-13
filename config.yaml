@@ -4,11 +4,11 @@ vault:
   # init_sql: "" # if not set, use default init sql file
 
 logging:
-  level: "DEBUG"  # "INFO"
+  level: "DEBUG" # "INFO"
 
 scheduler:
   interval_seconds: 60
   escalator_interval_seconds: 300
 
 slack:
-  channel: "C09RC3VSA94"  # test-channel
+  channel: ""

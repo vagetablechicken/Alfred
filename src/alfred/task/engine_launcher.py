@@ -1,9 +1,11 @@
 from datetime import datetime
+import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 
 from . import task_engine
 
+logger = logging.getLogger(__name__)
 
 def task_engine_job():
     current_time = datetime.now()
@@ -29,6 +31,6 @@ def launch_engine_scheduler(seconds: int = 60) -> bool:
         scheduler.start()
         return True
     except Exception as e:
-        print(f"Error starting scheduler: {e}")
+        logger.exception(f"Error starting scheduler: {e}")
         scheduler.shutdown()
         return False

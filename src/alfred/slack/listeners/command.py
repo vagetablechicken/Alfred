@@ -21,24 +21,32 @@ def handle_alfred_command(ack, body, client, logger, say):
     user_id = body["user_id"]
     # text is no /alfred prefix
     text = body.get("text", "").strip()
-    print(f"User {user_id} triggered /alfred with: {text}")
+    logger.info(f"User {user_id} triggered /alfred with: {text}")
 
     try:
         args_list = shlex.split(text)
-        print(f"Parsed args: {args_list}")
+        logger.debug(f"Parsed args: {args_list}")
         alfred_cli_app(args_list, obj=AppState(logger, say))
     except typer.BadParameter as e:
         # Typer 的验证错误
         logger.exception(f"Typer parameter error: {e}")
+        say(f"❌ *参数错误*:\n`{e}`")
     except SystemExit as e:
         # Typer 默认在 --help 或出错时会退出程序
         if e.code == 0:
             logger.info("\n--- Typer 帮助信息 (已捕获) ---")
+            say(
+                "```"
+                + alfred_cli_app.get_help(ctx=typer.Context(alfred_cli_app))
+                + "```"
+            )
         else:
             logger.info("\n--- Typer 参数错误 (已捕获) ---")
             logger.info("  (Tip: 可能是缺少了必需的参数)")
+            say(f"❌ *参数错误*:\n`请检查您的命令格式或使用 --help 获取帮助`")
     except Exception as e:
         logger.exception(f"Unknown error: {e}")
+        say(f"❌ *发生错误*:\n`{e}`")
 
 
 # bind logger and say to AppState for Typer commands
@@ -53,7 +61,7 @@ def validate_cron(value: str) -> str:
     """检查是否为有效的 Cron 表达式"""
     if not croniter.is_valid(value):
         raise typer.BadParameter(f"'{value}' 不是一个有效的 cron 表达式")
-    print(f"Validated Cron: {value}")
+    # print(f"Validated Cron: {value}")
     return value
 
 
@@ -67,13 +75,13 @@ def validate_duration(value: str) -> str:
     match = re.match(r"^(\d+)([smhd])$", value_str)
     if match:
         # 验证通过 (e.g., '1h', '3m')
-        print(f"Validated Duration: {value_str}")
+        # print(f"Validated Duration: {value_str}")
         return value_str
 
     match_int = re.match(r"^(\d+)$", value_str)
     if match_int:
         # 验证通过 (e.g., '1', 假定为 '1d')
-        print(f"Validated Duration: {value_str} (assumed days)")
+        # print(f"Validated Duration: {value_str} (assumed days)")
         return value_str
 
     raise typer.BadParameter(f"无法解析的持续时间/bias格式: '{value}'")
@@ -204,8 +212,13 @@ def test_send(ctx: typer.Context):
     say = ctx.obj.say
     logger.info(f"Creating test Block Kit message...")
 
-    blocks = butler._build_single_todo_blocks(
-        {"todo_id": 9999, "todo_content": "Test Task", "status": "pending"}
+    blocks = butler._build_single_todo_accessory_blocks(
+        {
+            "user_id": "foo",
+            "todo_id": 9999,
+            "todo_content": "Test Task",
+            "status": "pending",
+        }
     )
 
     # Send this Block Kit (default ephemeral)

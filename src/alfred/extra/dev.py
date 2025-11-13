@@ -1,5 +1,4 @@
 # local development, should disable in production
-from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import request
 from .flask_app import flask_app
 from ..slack.app import socket_mode_handler

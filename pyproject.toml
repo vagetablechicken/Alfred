@@ -26,4 +26,4 @@ version = "0.0.1"
 where = ["src"]  # 告诉 setuptools 你的包在 "src" 目录里
 
 [project.scripts]
-alfred = "alfred.alfred:alfred_in"
+alfred = "alfred.main:alfred_in"

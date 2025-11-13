@@ -100,7 +100,6 @@ def setup_global_logger(
     """
 
     # 1. 获取根记录器 (root logger)
-    # 根记录器是所有 logging.getLogger(__name__) 的父级
     logger = logging.getLogger()
 
     # 设置根记录器的最低处理级别为 DEBUG，

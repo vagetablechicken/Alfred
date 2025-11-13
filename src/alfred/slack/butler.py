@@ -75,7 +75,7 @@ class Butler:
                 )
                 todos_today = self.bulletin.get_todos(current_time.date())
                 for todo in todos_today:
-                    blocks.extend(self._build_single_todo_blocks(todo))
+                    blocks.extend(self._build_single_todo_accessory_blocks(todo))
                     blocks.append({"type": "divider"})
                 if blocks[-1]["type"] == "divider":
                     blocks.pop()
@@ -125,7 +125,7 @@ class Butler:
             # 循环遍历所有逾期任务
             for todo in overdue_todos:
                 # 调用辅助函数来生成该任务的 blocks
-                blocks.extend(self._build_single_todo_blocks(todo))
+                blocks.extend(self._build_single_todo_accessory_blocks(todo))
                 # 在每个任务后添加一个分隔线
                 blocks.append({"type": "divider"})
 
@@ -145,7 +145,7 @@ class Butler:
         else:
             # 循环遍历所有普通任务
             for todo in normal_todos:
-                blocks.extend(self._build_single_todo_blocks(todo))
+                blocks.extend(self._build_single_todo_accessory_blocks(todo))
                 blocks.append({"type": "divider"})
 
         # 清理：移除最后多余的那个分隔线
@@ -225,7 +225,84 @@ class Butler:
         todo = self.bulletin.get_todo(todo_id)
         if not todo:
             raise ValueError(f"Todo with id {todo_id} not found.")
-        return self._build_single_todo_blocks(todo)
+        return self._build_single_todo_accessory_blocks(todo)
+
+    def replace_todo_blocks_in_message(
+        self, original_blocks, todo_id: int, new_todo_blocks
+    ):
+        # single accessory blocks contains only section block
+        section_block_id = f"todo_section_{todo_id}"
+        new_blocks = []
+        for block in original_blocks:
+            if block.get("block_id") == section_block_id:
+                new_blocks.extend(new_todo_blocks)
+            else:
+                new_blocks.append(block)
+        return new_blocks
+
+    def _build_single_todo_accessory_blocks(self, todo):
+        todo_id = todo["todo_id"]
+        user_id = todo["user_id"]
+        todo_content = todo["todo_content"]
+        status = todo["status"]
+
+        section_block_id = f"todo_section_{todo_id}"
+
+        accessory = (
+            {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "✅ Complete"},
+                "style": "primary",
+                "action_id": "mark_todo_complete",
+                "value": str(todo_id),
+            }
+            if status == "pending"
+            else {
+                "type": "button",
+                "text": {"type": "plain_text", "text": "↩️ Undo"},
+                "style": "danger",
+                "action_id": "mark_todo_undo",
+                "value": str(todo_id),
+            }
+        )
+
+        def todo_text():
+            status_emoji_map = {
+                "pending": "⏳ Pending",
+                "completed": "✅ Completed",
+                "revoked": "↩️ Revoked",
+            }
+            # 如果状态未知，就显示原始的 status 字符串
+            status_display = status_emoji_map.get(status, status)
+
+            # 2. 根据状态格式化任务内容
+            # 'completed' 或 'revoked' 状态使用删除线
+            if status in ("completed", "revoked"):
+                text_content_display = f"~{todo_content}~"
+            else:
+                # 'pending' 状态使用粗体
+                text_content_display = f"*{todo_content}*"
+
+            # 3. 格式化元数据行 (使用引用块 > 和 | 分隔)
+            metadata_display = (
+                f"> *By*: <@{user_id}> | *ID*: {todo_id} | *Status*: {status_display}"
+            )
+
+            # 4. 组合成最终的 mrkdwn 文本
+            #    \n 是一个换行符
+            return f"{text_content_display}\n{metadata_display}"
+
+        section_block = {
+            "type": "section",
+            "block_id": section_block_id,
+            "text": {
+                "type": "mrkdwn",
+                "text": todo_text(),
+            },
+            "accessory": accessory,
+        }
+        # for compatibility
+        return [section_block]
 
     def mark_todo_complete(self, todo_id: int):
         """mark a task as completed"""
@@ -238,7 +315,7 @@ class Butler:
     def add_template(self, user_id, name, cron, ddl_offset, run_once):
         return self.bulletin.add_template(user_id, name, cron, ddl_offset, run_once)
 
-    def get_todos(self, for_date = None):
+    def get_todos(self, for_date=None):
         return self.bulletin.get_todos(for_date)
 
     def get_templates(self):

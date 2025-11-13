@@ -1,18 +1,16 @@
-import os
-import logging
+from alfred.utils.config import setup_global_logger
 
-from .utils.config import setup_global_logger
-
-from .task.engine_launcher import launch_engine_scheduler
-from .slack.patrol_launcher import launch_patrol_scheduler
-from .slack.app import socket_mode_handler
-from .slack import listeners
+from alfred.task.engine_launcher import launch_engine_scheduler
+from alfred.slack.patrol_launcher import launch_patrol_scheduler
+from alfred.slack.app import socket_mode_handler
+from alfred.slack import listeners
+_ = listeners  # to avoid unused import warning
 
 # register
-from .extra.flask_app import flask_app
+from alfred.extra.flask_app import flask_app
 
 # for dev, bind slack events to flask app
-from .extra import dev
+from alfred.extra import dev
 
 _ = dev  # to avoid unused import warning
 

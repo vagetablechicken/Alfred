@@ -16,43 +16,28 @@ def handle_mark_todo_complete(ack, body, client, logger):
     todo_id_str = action["value"]
     user_id = body["user"]["id"]
 
-    # 获取原始消息的时间戳和 blocks
     message_ts = body["container"]["message_ts"]
     channel_id = body["container"]["channel_id"]
     original_blocks = body["message"]["blocks"]
-
     logger.info(f"User {user_id} clicked 'log_todo_button' for todo_id {todo_id_str}")
 
     try:
         todo_id = int(todo_id_str)
         butler.mark_todo_complete(todo_id)
-
-        # update the message to reflect the completed status
-
-        # find the relevant blocks to update
-        action_block_id = action["block_id"]  # e.g., "todo_1_actions"
-        section_block_id = action_block_id.replace("_actions", "_section")
-
         # generate from todo id, more clear
         completed_blocks = butler.build_single_todo_blocks(todo_id)
+        new_blocks = butler.replace_todo_blocks_in_message(
+            original_blocks, todo_id, completed_blocks
+        )
 
-        # TODO: 替换有问题
-        new_blocks = []
-        for block in original_blocks:
-            # TODO: 依赖顺序可能不太好，考虑用 block_id 来匹配
-            if block.get("block_id") == section_block_id:
-                # 这是我们要替换的 section, 先跳过
-                pass
-            elif block.get("block_id") == action_block_id:
-                # 这是我们要替换的 actions, 把新 blocks 加进去
-                new_blocks.extend(completed_blocks)
-            else:
-                # 这是其他 block, 保持原样
-                new_blocks.append(block)
-
-        # 6. 调用 client.chat_update
         client.chat_update(
             channel=channel_id, ts=message_ts, blocks=new_blocks, text="任务列表已更新"
+        )
+
+        client.chat_postMessage(
+            channel=channel_id,
+            thread_ts=message_ts,
+            text=f"✅ <@{user_id}> 于 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 完成了任务。",
         )
 
     except Exception as e:
@@ -68,10 +53,8 @@ def handle_mark_todo_undo(ack, body, client, logger):
     """
     监听 "Undo" 按钮点击, 撤销任务完成状态。
     """
-    # 1. ACK
     ack()
 
-    # 2. 获取数据
     action = body["actions"][0]
     todo_id_str = action["value"]
     user_id = body["user"]["id"]
@@ -86,22 +69,18 @@ def handle_mark_todo_undo(ack, body, client, logger):
 
         butler.mark_todo_undo(todo_id)
         pending_blocks = butler.build_single_todo_blocks(todo_id)
+        new_blocks = butler.replace_todo_blocks_in_message(
+            original_blocks, todo_id, pending_blocks
+        )
 
-        # 5. 在原始 blocks 列表中替换掉 "Completed" blocks
-        new_blocks = []
-        for block in original_blocks:
-            if block.get("block_id") == action["block_id"].replace(
-                "_actions", "_section"
-            ):
-                pass
-            elif block.get("block_id") == action["block_id"]:
-                new_blocks.extend(pending_blocks)
-            else:
-                new_blocks.append(block)
-
-        # 6. 调用 client.chat_update
         client.chat_update(
             channel=channel_id, ts=message_ts, blocks=new_blocks, text="任务列表已更新"
+        )
+
+        client.chat_postMessage(
+            channel=channel_id,
+            thread_ts=message_ts,
+            text=f"↩️ <@{user_id}> 于 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 撤销了任务完成状态。",
         )
 
     except Exception as e:

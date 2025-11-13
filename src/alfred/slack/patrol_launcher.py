@@ -16,7 +16,7 @@ def patrol_job():
         if not blocks:
             # nothing to notify
             return
-        res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks)
+        res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="任务提醒")
         if not res["ok"]:
             raise Exception(f"Slack API error: {res}")
 
@@ -24,7 +24,7 @@ def patrol_job():
     with butler.gather_end_of_day_summary() as blocks:
         if not blocks:
             return
-        res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks)
+        res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="今日任务总结")
         if not res["ok"]:
             raise Exception(f"Slack API error: {res}")
 
@@ -47,6 +47,6 @@ def launch_patrol_scheduler(seconds=60):
         scheduler.start()
         return True
     except Exception as e:
-        print(f"Error starting scheduler: {e}")
+        logger.exception(f"Error starting scheduler: {e}")
         scheduler.shutdown()
         return False

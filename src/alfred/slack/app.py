@@ -1,3 +1,4 @@
+import logging
 import os
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -5,7 +6,9 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 assert os.environ.get(
     "SLACK_BOT_TOKEN"
 ), "SLACK_BOT_TOKEN environment variable is required."
-app = App(token=os.environ["SLACK_BOT_TOKEN"])
+# add logger
+logger = logging.getLogger(__name__)
+app = App(token=os.environ["SLACK_BOT_TOKEN"], logger=logger)
 
 # SlackRequestHandler translates WSGI requests to Bolt's interface
 # and builds WSGI response from Bolt's response.

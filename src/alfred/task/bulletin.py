@@ -23,8 +23,11 @@ class Bulletin:
             with self.vault.transaction() as cur:
                 result = cur.execute(
                     "SELECT status FROM todos WHERE todo_id = ?", (todo_id,)
-                ).fetchone()
-                old_status = result['status'] if result else None
+                ).fetchall()
+                assert (
+                    len(result) == 1
+                ), f"Expected one result for todo_id {todo_id}, got {len(result)}"
+                old_status = result[0]["status"]
                 if old_status in ("completed", "revoked"):
                     self.logger.info(
                         f"Todo {todo_id} is already in a final state ({old_status})."
@@ -51,8 +54,8 @@ class Bulletin:
         try:
             with self.vault.transaction() as cur:
                 result = cur.execute(
-                    "SELECT status, ddl_time FROM todos WHERE todo_id = ?", (todo_id,)
-                )
+                    "SELECT status FROM todos WHERE todo_id = ?", (todo_id,)
+                ).fetchall()
 
                 if not result:
                     self.logger.error(f"ERROR: Todo {todo_id} not found.")
@@ -61,7 +64,7 @@ class Bulletin:
                     len(result) == 1
                 ), f"Expected one result for todo_id {todo_id}, got {len(result)}"
 
-                old_status, ddl_time_str = result[0]["status"], result[0]["ddl_time"]
+                old_status = result[0]["status"]
 
                 if old_status != "completed":
                     self.logger.error(
@@ -69,9 +72,8 @@ class Bulletin:
                     )
                     return
 
-                # we determine new status based on ddl_time
-                ddl_time = datetime.datetime.fromisoformat(ddl_time_str)
-                new_status = "escalated" if current_time >= ddl_time else "pending"
+                # we don't determine new status based on ddl_time, all go back to pending
+                new_status = "pending"
 
                 cur.execute(
                     "UPDATE todos SET status = ?, updated_at = ? WHERE todo_id = ?",
@@ -185,7 +187,6 @@ class Bulletin:
                 rows = cur.execute(f"SELECT * FROM {table_name}").fetchall()
                 all_data[table_name] = [dict(row) for row in rows]
         return all_data
-
 
     def get_templates(self):
         """get all todo templates"""
