@@ -8,8 +8,11 @@ from . import task_engine
 logger = logging.getLogger(__name__)
 
 def task_engine_job():
-    current_time = datetime.now()
-    task_engine.instance.run_scheduler(current_time)
+    try:
+        current_time = datetime.now()
+        task_engine.instance.run_scheduler(current_time)
+    except Exception as e:
+        logger.exception(f"Error in task engine job: {e}")
 
 
 def launch_engine_scheduler(seconds: int = 60) -> bool:

@@ -18,11 +18,11 @@ class Butler:
 
     @contextmanager
     def gather_notify_blocks(self):
-        """gather overdue tasks as Slack blocks"""
+        """gather today pending tasks as Slack blocks"""
         current_time = datetime.now()
         todos_today = self.bulletin.get_todos(current_time.date())
 
-        # filter overdue tasks, some todos have already been reminded, skip those
+        # filter pending tasks, some todos have already been reminded, skip those
         def need_normal_remind(todo):
             # todo times are str
             remind_time = datetime.fromisoformat(todo["remind_time"])
@@ -30,6 +30,7 @@ class Butler:
             return (
                 remind_time <= current_time < ddl_time
                 and todo["todo_id"] not in self.sent_notifies["normal"]
+                and todo["status"] == "pending"
             )
 
         def need_overdue_remind(todo):
@@ -37,6 +38,7 @@ class Butler:
             return (
                 ddl_time <= current_time
                 and todo["todo_id"] not in self.sent_notifies["overdue"]
+                and todo["status"] == "pending"
             )
 
         normal_todos = [todo for todo in todos_today if need_normal_remind(todo)]
@@ -69,6 +71,7 @@ class Butler:
                 current_time.date() not in self.sent_summaries
                 and current_time.hour >= 18
             ):
+                self.logger.info("[Butler] Gathering end-of-day summary.")
                 blocks.append(
                     {
                         "type": "header",
@@ -90,9 +93,7 @@ class Butler:
                 return
             self.logger.info("[Butler] Successfully sent end-of-day summary.")
             self.sent_summaries.add(current_time.date())
-            self.logger.debug(
-                f"[Butler] Updated sent_summaries: {self.sent_summaries}"
-            )
+            self.logger.debug(f"[Butler] Updated sent_summaries: {self.sent_summaries}")
 
     def _build_blocks(self, normal_todos, overdue_todos):
         """interactive block building"""

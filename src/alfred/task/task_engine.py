@@ -139,9 +139,9 @@ class TaskEngine:
                         )
 
             if created_count == 0:
-                self.logger.info("[Scheduler] No new tasks to schedule at this time.")
+                self.logger.info("[Scheduler] No new todo to schedule at this time.")
             else:
-                self.logger.info(f"[Scheduler] Created {created_count} new tasks.")
+                self.logger.info(f"[Scheduler] Created {created_count} new todo.")
 
         except sqlite3.Error as e:
             self.logger.error(f"[Scheduler] DB ERROR: {e}")
