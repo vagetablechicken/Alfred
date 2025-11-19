@@ -13,6 +13,11 @@ python_files = ["test_*.py", "bench_*.py"]
 python_functions = ["test_*", "bench_*"]
 log_cli = true
 log_cli_level = "INFO"
+# 默认跳过集成测试，除非显式指定 -m integration
+addopts = "-m 'not integration'"
+markers = [
+    "integration: marks tests as integration tests (deselect with default, run with -m integration)",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

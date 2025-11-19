@@ -1,8 +1,8 @@
 # Alfred
 
 Alfred管家，她会负责时间管理：
-- 定时创建提醒message，发送到slack，可以slack中选择完成任务/撤销完成。
-- 再过一个ddl，还不完成就escalate到指定用户。
+- 定时创建提醒message，发送到slack频道，可以slack中选择完成任务/撤销完成。
+- 再过一个ddl，还不完成就再发一次提醒到slack频道。（目前未实现escalate DM到指定用户）
 - 每日总结待办事项的完成情况，方便leader检查，避免遗忘。（不要通过这个方式批评下属，工作多了是容易忘记的，此项目旨在帮助大家更好地检查任务完成情况）
 
 苦免费版todo management卡脖子久矣。要不不能集成到slack，要不不能自动生成任务，要不付费过于离谱，索性自己写一个。
@@ -68,18 +68,50 @@ alfred
 
 ### 4. 测试
 
+Alfred 使用 pytest 进行测试，自动使用 `config.test.yaml`（内存数据库）。
+
+#### 运行单元测试（默认）
+
 ```bash
-pytest  # 自动使用 config.test.yaml（内存数据库）
+# 默认跳过集成测试，使用 Slack API mocks
+pytest
+```
+
+所有单元测试会自动 mock Slack API，不需要真实的 Slack token。
+
+#### 运行集成测试
+
+集成测试需要真实的 Slack API 连接：
+
+```bash
+# 设置真实的 Slack tokens
+export SLACK_BOT_TOKEN="xoxb-your-real-token"
+export SLACK_APP_TOKEN="xapp-your-real-token"
+
+# 运行集成测试
+pytest -m integration
+```
+
+#### 运行所有测试
+
+```bash
+# 包括单元测试和集成测试
+pytest -m ""
 ```
 
 然后在Slack中邀请bot加入频道。
 
-
-测试
-mock request，不用和slack通信。
-
-
-slack中可以通过命令行测试，检查权限，交互是否正确等：
+Slack中可以通过命令行测试，检查权限，交互是否正确等：
 ```
 /alfred test
 ```
+
+## Slack 进阶
+
+如果对TODO界面有更高要求，可以参考[Slack Block Kit](https://api.slack.com/block-kit)自定义消息界面。并在`alfred/slack/block_builder.py`中替换相关函数。
+
+需要预览和调试Block，可以使用官方的Block Kit Builder工具：https://app.slack.com/block-kit-builder 。
+
+## 贡献
+
+请先创建issue讨论需求，再提交PR。

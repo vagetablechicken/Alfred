@@ -4,3 +4,4 @@ from . import command
 from . import message
 from . import action
 from . import base
+from . import home

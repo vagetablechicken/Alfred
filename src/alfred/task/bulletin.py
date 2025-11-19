@@ -2,7 +2,7 @@ from datetime import datetime, date
 import logging
 import sqlite3
 
-from .vault import LockedSqliteVault  # import the singleton vault instance
+from alfred.task.vault import LockedSqliteVault  # import the singleton vault instance
 
 
 class Bulletin:

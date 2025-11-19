@@ -1,9 +1,9 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 
-from .butler import butler
-from .app import app
-from ..utils.config import get_slack_channel
+from alfred.slack.butler import butler
+from alfred.slack.app import app
+from alfred.utils.config import get_slack_channel
 
 import logging
 
