@@ -148,7 +148,7 @@ def handle_cron_submission(ack, body, view, logger, client):
             user_id=target_user_id,
             content=content,
             cron=cron_exp,
-            offset=offset_val,
+            ddl_offset=offset_val,
             run_once=int(run_once_val),
         )
         logger.info(f"Successfully added cron template ID {template_id}")

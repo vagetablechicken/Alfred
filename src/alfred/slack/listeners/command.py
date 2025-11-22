@@ -182,7 +182,7 @@ def add_template(
         user_id=user_id,
         content=content,
         cron=cron,
-        offset=offset,
+        ddl_offset=offset,
         run_once=run_once,
     )
     ctx.obj.logger.info(
