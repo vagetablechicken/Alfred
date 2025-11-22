@@ -26,19 +26,16 @@ class Butler:
 
         # filter pending todos, some todos have already been reminded, skip those
         def need_normal_remind(todo):
-            # todo times are str
-            remind_time = datetime.fromisoformat(todo["remind_time"])
-            ddl_time = datetime.fromisoformat(todo["ddl_time"])
+            # todo times are datetime
             return (
-                remind_time <= current_time < ddl_time
+                todo["remind_time"] <= current_time < todo["ddl_time"]
                 and todo["todo_id"] not in self.sent_notifies["normal"]
                 and todo["status"] == "pending"
             )
 
         def need_overdue_remind(todo):
-            ddl_time = datetime.fromisoformat(todo["ddl_time"])
             return (
-                ddl_time <= current_time
+                todo["ddl_time"] <= current_time
                 and todo["todo_id"] not in self.sent_notifies["overdue"]
                 and todo["status"] == "pending"
             )
