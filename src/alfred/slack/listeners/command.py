@@ -1,3 +1,4 @@
+from datetime import datetime
 import enum
 from croniter import croniter
 import re
@@ -6,7 +7,7 @@ import shlex
 
 from alfred.slack.block_builder import BlockBuilder
 from alfred.utils.config import get_slack_admin
-from alfred.utils.format import format_templates, format_todo_logs, format_todos
+from alfred.utils.format import build_add_template_view, format_templates, format_todo_logs, format_todos
 
 from alfred.slack.app import app
 from alfred.slack.butler import butler
@@ -44,7 +45,14 @@ def handle_alfred_command(ack, body, client, logger, say):
     try:
         args_list = shlex.split(text)
         logger.debug(f"Parsed args: {args_list}")
-        alfred_cli_app(args_list, obj=AppState(logger, say_ephemeral, say))
+        # bind logger and say to AppState for Typer commands
+        class AppState:
+            def __init__(self, logger, say_ephemeral, say):
+                self.logger = logger
+                self.say_ephemeral = say_ephemeral
+                self.say = say
+                self.trigger_id = body.get("trigger_id")
+        alfred_cli_app(args_list, obj=AppState(logger, say_ephemeral, say), standalone_mode=False)
     except typer.BadParameter as e:
         # Typer validation error
         logger.exception(f"Typer parameter error: {e}")
@@ -63,13 +71,6 @@ def handle_alfred_command(ack, body, client, logger, say):
     except Exception as e:
         logger.exception(f"Unknown error: {e}")
         say_ephemeral(f"❌ *Error occurred*:\n`{e}`")
-
-
-# bind logger and say to AppState for Typer commands
-class AppState:
-    def __init__(self, logger, say):
-        self.logger = logger
-        self.say = say
 
 
 # validators for Typer arguments
@@ -135,7 +136,19 @@ alfred_cli_app = typer.Typer(
 add_app = typer.Typer(help="Add (e.g., 'template')")
 alfred_cli_app.add_typer(add_app, name="add")
 
+# add will create interactive modal
+@add_app.callback(invoke_without_command=True)
+def add_main(ctx: typer.Context):
+    if ctx.invoked_subcommand is None:
+        ctx.obj.logger.info("No subcommand provided for 'add'. Opening modal...")
+        ctx.obj.client.views_open(
+            trigger_id=ctx.obj.trigger_id,
+            view=build_add_template_view(view="submit_cron_template"),
+        )
+    # subcommand will handle the rest if provided
 
+
+# add template command for developer
 @add_app.command(
     "template",
     help="• /alfred add template <user_id> <name> <cron> <offset> [<run_once>]",
@@ -232,11 +245,14 @@ def test_send(ctx: typer.Context):
             "todo_id": 9999,
             "todo_content": "Test Task",
             "status": "pending",
-            "remind_time": "2020-01-01T00:00:00",
+            "remind_time": datetime.strptime(
+                "2020-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"
+            ),
+            "ddl_time": datetime.strptime("2020-01-01 01:00:00", "%Y-%m-%d %H:%M:%S"),
         }
     )
 
-    # Send this Block Kit (default ephemeral)
+    # Send this Block Kit message publicly
     try:
         say(text="Block Kit Test Message", blocks=blocks)
     except Exception as e:

@@ -44,15 +44,22 @@ def generate_home_view(today, user_name):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*I'm your team task assistant.*\n\nTo keep the interface clean, I don't show lists here. Please send commands directly in *Messages* and I'll help you track everything.",
+                    "text": "*I'm your team task assistant.*\n\nYou can create a new task template using the button below, or use `/alfred ` commands in messages.",
                 },
             },
             {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "Interactive task creation is not yet supported on this page. Stay tuned for more features!",
-                },
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":heavy_plus_sign: Add Template",
+                        },
+                        "style": "primary",
+                        "action_id": "open_add_template_modal",
+                    }
+                ],
             },
             {"type": "divider"},
             {
