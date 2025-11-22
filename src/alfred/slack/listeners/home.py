@@ -5,18 +5,18 @@ from alfred.slack.app import app
 @app.event("app_home_opened")
 def update_home_tab(client, event, logger):
     user_id = event["user"]
-    today = datetime.now().date().strftime("%Y年%m月%d日")
+    today = datetime.now().date().strftime("%Y-%m-%d")
 
-    # 1. 获取用户名
+    # 1. Get username
     try:
         user_info = client.users_info(user=user_id)
-        # 优先使用 display_name (昵称)，如果没有则用 real_name (全名)
+        # Prefer display_name (nickname), fallback to real_name (full name)
         user_name = user_info["user"]["profile"].get("display_name") or user_info[
             "user"
         ].get("real_name")
     except Exception as e:
-        logger.error(f"获取用户信息失败: {e}")
-        user_name = "用户"  # 兜底称呼
+        logger.error(f"Failed to fetch user info: {e}")
+        user_name = "User"  # Fallback name
 
     try:
         client.views_publish(
@@ -33,25 +33,25 @@ def generate_home_view(today, user_name):
         "blocks": [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": f"👋 您好，{user_name}"},
+                "text": {"type": "plain_text", "text": f"👋 Hello, {user_name}"},
             },
             {
                 "type": "context",
-                "elements": [{"type": "mrkdwn", "text": f"📅 {today} | 🤖 我已就绪"}],
+                "elements": [{"type": "mrkdwn", "text": f"📅 {today} | 🤖 Ready"}],
             },
             {"type": "divider"},
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*我是您的团队任务助手。*\n\n为了保持界面清爽, 我不在这里展示列表。请直接在 *Messages(消息页)* 发送指令给我，我会帮您记录一切。",
+                    "text": "*I'm your team task assistant.*\n\nTo keep the interface clean, I don't show lists here. Please send commands directly in *Messages* and I'll help you track everything.",
                 },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "暂时不支持在此页面操作, 以及交互创建任务, 敬请期待更多功能！",
+                    "text": "Interactive task creation is not yet supported on this page. Stay tuned for more features!",
                 },
             },
             {"type": "divider"},
@@ -60,7 +60,7 @@ def generate_home_view(today, user_name):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "需要帮助？随时输入 `/alfred help`。",
+                        "text": "Need help? Type `/alfred help` anytime.",
                     }
                 ],
             },

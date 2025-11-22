@@ -1,8 +1,8 @@
-import pytest
 from datetime import datetime, timedelta
 
 from alfred.task.bulletin import Bulletin
-from alfred.task.vault import LockedSqliteVault
+from alfred.task.vault import get_vault
+from alfred.task.vault.models import Todo, TodoStatus, TodoStatusLog
 
 
 def test_complete_todo_records_status_and_log():
@@ -17,18 +17,23 @@ def test_complete_todo_records_status_and_log():
 		run_once=0,
 	)
 
-	vault = LockedSqliteVault()
+	vault = get_vault()
 	now = datetime.now()
-	remind_iso = now.isoformat()
-	ddl_iso = (now + timedelta(hours=1)).isoformat()
+	remind_time = now
+	ddl_time = now + timedelta(hours=1)
 
-	# insert a pending todo directly
-	with vault.transaction() as cur:
-		cur.execute(
-			"INSERT INTO todos (template_id, user_id, remind_time, ddl_time, status) VALUES (?, ?, ?, ?, ?)",
-			(template_id, "U_TEST", remind_iso, ddl_iso, "pending"),
+	# insert a pending todo directly using ORM
+	with vault.session_scope() as session:
+		todo = Todo(
+			template_id=template_id,
+			user_id="U_TEST",
+			remind_time=remind_time,
+			ddl_time=ddl_time,
+			status=TodoStatus.PENDING,
 		)
-		todo_id = cur.lastrowid
+		session.add(todo)
+		session.flush()
+		todo_id = todo.id
 
 	# mark completed
 	bulletin.complete_todo(todo_id, now)
@@ -56,23 +61,31 @@ def test_revert_todo_completion_sets_pending_and_logs():
 		run_once=0,
 	)
 
-	vault = LockedSqliteVault()
+	vault = get_vault()
 	now = datetime.now()
-	remind_iso = now.isoformat()
-	ddl_iso = (now + timedelta(hours=1)).isoformat()
+	remind_time = now
+	ddl_time = now + timedelta(hours=1)
 
-	# insert a completed todo directly
-	with vault.transaction() as cur:
-		cur.execute(
-			"INSERT INTO todos (template_id, user_id, remind_time, ddl_time, status) VALUES (?, ?, ?, ?, ?)",
-			(template_id, "U_TEST2", remind_iso, ddl_iso, "completed"),
+	# insert a completed todo directly using ORM
+	with vault.session_scope() as session:
+		todo = Todo(
+			template_id=template_id,
+			user_id="U_TEST2",
+			remind_time=remind_time,
+			ddl_time=ddl_time,
+			status=TodoStatus.COMPLETED,
 		)
-		todo_id = cur.lastrowid
+		session.add(todo)
+		session.flush()
+		todo_id = todo.id
 		# insert an initial completion log to simulate prior completion
-		cur.execute(
-			"INSERT INTO todo_status_logs (todo_id, old_status, new_status, changed_at) VALUES (?, ?, ?, ?)",
-			(todo_id, "pending", "completed", now.isoformat()),
+		log = TodoStatusLog(
+			todo_id=todo_id,
+			old_status=TodoStatus.PENDING,
+			new_status=TodoStatus.COMPLETED,
+			changed_at=now,
 		)
+		session.add(log)
 
 	# revert completion
 	bulletin.revert_todo_completion(todo_id, now)

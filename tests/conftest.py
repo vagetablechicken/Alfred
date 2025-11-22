@@ -42,16 +42,25 @@ def _setup_slack_mocks():
 
 
 @pytest.fixture(autouse=True)
-def mock_vault():
+def test_vault():
     """
     Fixture to provide a clean vault for each test.
     """
-    from alfred.task.vault import LockedSqliteVault
+    from alfred.task.vault import get_vault
+    from alfred.task.vault.models import TodoStatusLog, Todo, TodoTemplate
 
-    vault = LockedSqliteVault()
-    with vault.transaction() as cur:
-        cur.execute("DELETE FROM todos")
-        cur.execute("DELETE FROM todo_templates")
-        cur.execute("DELETE FROM todo_status_logs")
+    vault = get_vault()
+    with vault.db as session:
+        # Delete in order: logs -> todos -> templates (respect foreign keys)
+        session.query(TodoStatusLog).delete()
+        session.query(Todo).delete()
+        session.query(TodoTemplate).delete()
 
+    # Verify all tables are empty
+    with vault.db as session:
+        assert session.query(TodoStatusLog).count() == 0
+        assert session.query(Todo).count() == 0
+        assert session.query(TodoTemplate).count() == 0
+
+    # it's ok to use get_vault() inside tests
     yield vault

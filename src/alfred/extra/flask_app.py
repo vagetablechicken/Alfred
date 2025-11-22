@@ -1,6 +1,7 @@
 from flask import Flask, make_response
 
 from alfred.task.bulletin import Bulletin
+from alfred.utils.format import format_templates, format_todos
 
 flask_app = Flask(__name__)
 
@@ -12,18 +13,15 @@ def index():
 @flask_app.route("/todos", methods=["GET"])
 def list_todos():
     todos = Bulletin().get_todos()
-    todo_list = (
-        "\n".join([f"• {t[0]}" for t in todos]) if todos else "_No todos found._"
-    )
+    if not todos:
+        todo_list = "_No todos found._"
+    else:
+        todo_list = format_todos(todos)
     return make_response(f"*Your Project TODOs:* \n{todo_list}", 200)
 
 
 @flask_app.route("/templates", methods=["GET"])
 def list_templates():
     templates = Bulletin().get_templates()
-    template_list = (
-        "\n".join([f"• {t[0]}" for t in templates])
-        if templates
-        else "_No templates found._"
-    )
+    template_list = format_templates(templates)
     return make_response(f"*Your Project Templates:* \n{template_list}", 200)

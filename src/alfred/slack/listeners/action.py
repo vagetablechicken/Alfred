@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from ..app import app
-from ..butler import butler
+from alfred.slack.app import app
+from alfred.slack.butler import butler
 
 
 @app.action("mark_todo_complete")
@@ -38,11 +38,12 @@ def handle_mark_todo_complete(ack, body, client, logger):
             channel=channel_id,
             thread_ts=message_ts,
             text=f"✅ <@{user_id}> 于 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 完成了任务。",
+            reply_broadcast=False,  # do not notify channel, just reply in thread
         )
 
     except Exception as e:
-        logger.exception(f"Failed to log todo via button")
-        # (出错时也应该通知用户)
+        logger.exception(f"Failed to log todo via button: {e}")
+        # if failed, notify user
         client.chat_postEphemeral(
             channel=channel_id, user=user_id, text=f"❌ *记录失败*:\n`{e}`"
         )
@@ -81,10 +82,11 @@ def handle_mark_todo_undo(ack, body, client, logger):
             channel=channel_id,
             thread_ts=message_ts,
             text=f"↩️ <@{user_id}> 于 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} 撤销了任务完成状态。",
+            reply_broadcast=False,
         )
 
     except Exception as e:
-        logger.error(f"Failed to undo todo via button: {e}")
+        logger.exception(f"Failed to undo todo via button: {e}")
         client.chat_postEphemeral(
             channel=channel_id, user=user_id, text=f"❌ *撤销失败*:\n`{e}`"
         )

@@ -1,1 +1,1 @@
-from .sqlite_vault import LockedSqliteVault
+from .sa_vault import Vault, get_vault

@@ -1,13 +1,13 @@
 from datetime import datetime, time, timedelta
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from alfred.slack.patrol_launcher import patrol_job
 from alfred.slack.butler import butler
 
 
 @pytest.mark.integration
 def test_butler_send_slack_with_bulletin_todos(monkeypatch):
-    """测试Butler通过Bulletin获取TODO并发送Slack消息"""
+    """Test Butler gets TODOs through Bulletin and sends Slack messages"""
     # Mock Bulletin
     mock_bulletin = Mock()
     current_time = datetime.now()

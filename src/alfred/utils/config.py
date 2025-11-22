@@ -1,4 +1,4 @@
-"""简单的配置加载器"""
+"""Simple configuration loader"""
 
 import os
 import sys
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_pytest_running() -> bool:
-    """检测是否在 pytest 环境中运行"""
+    """Detect if running in pytest environment"""
     return (
         "PYTEST_CURRENT_TEST" in os.environ
         or "pytest" in sys.modules
@@ -20,20 +20,20 @@ def _is_pytest_running() -> bool:
 
 def load_config(config_file: str = None):
     """
-    加载配置文件
+    Load configuration file
 
-    优先级:
-    1. config_file 参数
-    2. ALFRED_CONFIG 环境变量
-    3. pytest 环境下自动使用 config.test.yaml
-    4. 默认使用 config.yaml
+    Priority:
+    1. config_file parameter
+    2. ALFRED_CONFIG environment variable
+    3. Auto use config.test.yaml in pytest environment
+    4. Default to config.yaml
     """
     if config_file is None:
-        # 检查环境变量
+        # Check environment variable
         config_file = os.getenv("ALFRED_CONFIG")
 
         if config_file is None:
-            # pytest 运行时自动使用测试配置
+            # Auto use test config when running pytest
             if _is_pytest_running():
                 config_file = "config.test.yaml"
             else:
@@ -57,25 +57,14 @@ def get_vault_path(config_file: str = None) -> str:
     db_path = config.get("vault", {}).get("path", "")
     if not db_path:
         raise ValueError("Vault database path not configured.")
+    # validate path, only support sqlite and postgresql for now
+    if not (db_path.startswith("sqlite://") or db_path.startswith("postgresql://")):
+        raise ValueError("Unsupported vault database path. Only sqlite and postgresql are supported.")
+
     return db_path
 
-
-def get_init_sql(config_file: str = None) -> str:
-    config = load_config(config_file)
-    # use default init sql if not specified
-    init_sql = config.get("vault", {}).get("init_sql", "")
-    # if empty, use default
-    if not init_sql:
-        project_root = Path(__file__).parent.parent
-        init_sql = str(project_root / "task/vault/sqlite_init.sql")
-
-    # read yaml file content
-    with open(init_sql, "r", encoding="utf-8") as f:
-        return f.read()
-
-
 def get_slack_channel(config_file: str = None) -> str:
-    """read file every time to get update"""
+    """Read file every time to get update"""
     config = load_config(config_file)
     # can't be None here, must be set in config
     channel = config.get("slack").get("channel")
@@ -83,7 +72,7 @@ def get_slack_channel(config_file: str = None) -> str:
 
 
 def get_slack_admin(config_file: str = None) -> str:
-    """read file every time to get update"""
+    """Read file every time to get update"""
     config = load_config(config_file)
     # can't be None here, must be set in config
     admin = config.get("slack").get("admin")
@@ -98,36 +87,36 @@ def setup_global_logger(
     Set up a global logger with both console and file handlers.
     """
 
-    # 1. 获取根记录器 (root logger)
+    # 1. Get root logger
     logger = logging.getLogger()
 
-    # 设置根记录器的最低处理级别为 DEBUG，
-    # 这样它才能处理所有级别的日志，具体的过滤交给 Handlers
+    # Set root logger's minimum level to DEBUG,
+    # so it can handle all log levels, specific filtering is delegated to Handlers
     logger.setLevel(logging.DEBUG)
 
-    # [时间] - [级别] - [模块名] - (文件名:行号) - [消息]
+    # [Time] - [Level] - [Module] - (File:Line) - [Message]
     formatter = logging.Formatter(
         "%(asctime)s - [%(levelname)s] - %(name)s - (%(filename)s:%(lineno)d) - %(message)s"
     )
 
-    # 创建并配置控制台 Handler (StreamHandler)
+    # Create and configure console Handler (StreamHandler)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(console_level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # 创建并配置文件 Handler (FileHandler)
+    # Create and configure file Handler (FileHandler)
     try:
-        # 使用 'a' 模式（追加）和 'utf-8' 编码
+        # Use 'a' mode (append) with 'utf-8' encoding
         file_handler = logging.FileHandler(log_file_name, mode="a", encoding="utf-8")
         file_handler.setLevel(file_level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     except IOError as e:
-        logger.error(f"无法创建日志文件 {log_file_name}. 错误: {e}")
-        # 即使文件创建失败，控制台日志依然可以工作
+        logger.error(f"Unable to create log file {log_file_name}. Error: {e}")
+        # Console logging still works even if file creation fails
 
-    logger.info("日志系统配置完成。")
+    logger.info("Logging system configured.")
     logger.info(
-        f"控制台级别: {logging.getLevelName(console_level)}, 文件级别: {logging.getLevelName(file_level)}"
+        f"Console level: {logging.getLevelName(console_level)}, File level: {logging.getLevelName(file_level)}"
     )

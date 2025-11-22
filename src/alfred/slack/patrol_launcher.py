@@ -14,14 +14,14 @@ def patrol_job():
     # read from engine, if tasks are due, send reminders
     with butler.gather_notify_blocks() as blocks:
         if blocks:
-            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="任务提醒")
+            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Task Reminder")
             if not res["ok"]:
                 raise Exception(f"Slack API error: {res}")
 
-    # 下班前发一个总结
+    # if end of day, send summary
     with butler.gather_end_of_day_summary() as blocks:
         if blocks:
-            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="今日任务总结")
+            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Daily Task Summary")
             if not res["ok"]:
                 raise Exception(f"Slack API error: {res}")
 
@@ -35,7 +35,7 @@ def launch_patrol_scheduler(seconds=60):
         scheduler.add_job(
             func=patrol_job,
             trigger="interval",
-            seconds=seconds,  # run every minute
+            seconds=seconds,  # run every minute by default, can set smaller value for testing
             id="butler_patrol_job",
             replace_existing=True,
             misfire_grace_time=60,

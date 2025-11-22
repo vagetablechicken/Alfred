@@ -1,63 +1,95 @@
 import threading
-import sqlite3
+from sqlalchemy import select
+
+from alfred.task.vault.models import TodoTemplate
+from alfred.task.vault import get_vault
+
+# test db in config.test.yaml, if you want to test with other db, change the config.test.yaml path
 
 
-def test_write_and_read_basic(mock_vault):
+def test_write_and_read_basic():
     # simple write
-    with mock_vault.transaction() as cur:
-        cur.execute(
-            "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-            (1, "t1", "* * * * *", "5m", 0),
+    vault = get_vault()
+    with vault.db as session:
+        template = TodoTemplate(
+            user_id="1", content="t1", cron="* * * * *", ddl_offset="5m", run_once=False
         )
-    with mock_vault.transaction() as cur:
-        rows = cur.execute("SELECT * FROM todo_templates").fetchall()
+        session.add(template)
+
+    with vault.db as session:
+        rows = session.execute(select(TodoTemplate)).scalars().all()
     assert rows and len(rows) == 1
 
 
-def test_context_transaction_commit(mock_vault):
-    with mock_vault.transaction() as cur:
-        cur.execute(
-            "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-            (2, "t2", "* * * * *", "5m", 0),
+def test_context_transaction_commit():
+    vault = get_vault()
+    with vault.db as session:
+        session.add(
+            TodoTemplate(
+                user_id="2",
+                content="t2",
+                cron="* * * * *",
+                ddl_offset="5m",
+                run_once=False,
+            )
         )
-        cur.execute(
-            "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-            (3, "t3", "* * * * *", "5m", 0),
+        session.add(
+            TodoTemplate(
+                user_id="3",
+                content="t3",
+                cron="* * * * *",
+                ddl_offset="5m",
+                run_once=False,
+            )
         )
-    with mock_vault.transaction() as cur:
-        rows = cur.execute(
-            "SELECT * FROM todo_templates ORDER BY template_id"
-        ).fetchall()
+
+    with vault.db as session:
+        rows = (
+            session.execute(select(TodoTemplate).order_by(TodoTemplate.id))
+            .scalars()
+            .all()
+        )
     assert rows and len(rows) == 2
 
 
-def test_context_transaction_rollback_on_error(mock_vault):
+def test_context_transaction_rollback_on_error():
+    vault = get_vault()
     try:
-        with mock_vault.transaction() as cur:
-            cur.execute(
-                "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-                (4, "t4", "* * * * *", "5m", 0),
+        with vault.db as session:
+            session.add(
+                TodoTemplate(
+                    user_id="4",
+                    content="t4",
+                    cron="* * * * *",
+                    ddl_offset="5m",
+                    run_once=False,
+                )
             )
-            # cause an error: table does not exist
-            cur.execute("INSERT INTO unknown_table (a) VALUES (?)", (1,))
-    except sqlite3.Error:
+            # cause an error: flush with invalid data or explicit raise
+            # SQLAlchemy usually flushes on commit, so we can force an error
+            raise Exception("Force rollback")
+    except Exception:
         pass
 
-    with mock_vault.transaction() as cur:
-        rows = cur.execute(
-            "SELECT * FROM todo_templates ORDER BY template_id"
-        ).fetchall()
+    with vault.db as session:
+        rows = session.execute(select(TodoTemplate)).scalars().all()
     # transaction should have been rolled back
     assert not rows
 
 
-def test_concurrent_writes(mock_vault):
+def test_concurrent_writes():
+    vault = get_vault()
     def worker(i):
         for j in range(10):
-            with mock_vault.transaction() as cur:
-                cur.execute(
-                    "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-                    (i, f"t{i}-{j}", "* * * * *", "5m", 0),
+            with vault.db as session:
+                session.add(
+                    TodoTemplate(
+                        user_id=str(i),
+                        content=f"t{i}-{j}",
+                        cron="* * * * *",
+                        ddl_offset="5m",
+                        run_once=False,
+                    )
                 )
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
@@ -66,24 +98,34 @@ def test_concurrent_writes(mock_vault):
     for t in threads:
         t.join()
 
-    with mock_vault.transaction() as cur:
-        rows = cur.execute("SELECT * FROM todo_templates").fetchall()
+    with vault.db as session:
+        rows = session.execute(select(TodoTemplate)).scalars().all()
     assert rows and len(rows) == 4 * 10
 
 
-def test_fetch_all(mock_vault):
+def test_fetch_all():
     # insert sample data
-    with mock_vault.transaction() as cur:
-        cur.execute(
-            "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-            (1, "t1", "* * * * *", "5m", 0),
+    vault = get_vault()
+    with vault.db as session:
+        session.add(
+            TodoTemplate(
+                user_id="1",
+                content="t1",
+                cron="* * * * *",
+                ddl_offset="5m",
+                run_once=False,
+            )
         )
-        cur.execute(
-            "INSERT INTO todo_templates (user_id, todo_content, cron, ddl_offset, run_once) VALUES (?, ?, ?, ?, ?)",
-            (2, "t2", "* * * * *", "10m", 1),
+        session.add(
+            TodoTemplate(
+                user_id="2",
+                content="t2",
+                cron="* * * * *",
+                ddl_offset="10m",
+                run_once=True,
+            )
         )
 
-    with mock_vault.transaction() as cur:
-        cur.execute("SELECT * FROM todo_templates")
-        all_data = cur.fetchall()
+    with vault.db as session:
+        all_data = session.execute(select(TodoTemplate)).scalars().all()
     assert all_data and len(all_data) == 2

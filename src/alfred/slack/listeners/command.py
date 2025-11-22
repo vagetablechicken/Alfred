@@ -4,7 +4,9 @@ import re
 import typer
 import shlex
 
+from alfred.slack.block_builder import BlockBuilder
 from alfred.utils.config import get_slack_admin
+from alfred.utils.format import format_templates, format_todo_logs, format_todos
 
 from ..app import app
 from ..butler import butler
@@ -169,19 +171,13 @@ def list_items(
         logger.info("正在获取所有 active todos...")
         # admin may want to see all todos
         todos = butler.get_todos()
-        if not todos:
-            say("No TODOs.")
-            return
-        todo_list = "\n".join([f"• {dict(t)}" for t in todos])
+        todo_list = format_todos(todos)
         logger.debug(f"Listing todos: {todo_list}")
         say(f"*TODOs:*\n{todo_list}")
     elif category == ListCategory.templates:
         logger.info("正在获取所有 templates...")
         templates = butler.get_templates()
-        if not templates:
-            say("No todo templates.")
-            return
-        template_list = "\n".join([f"• {dict(t)}" for t in templates])
+        template_list = format_templates(templates)
         logger.debug(f"Listing templates: {template_list}")
         say(f"*Task Templates:*\n{template_list}")
 
@@ -202,14 +198,8 @@ def log_todo(
     logger.info(f"Getting log for todo_id: {todo_id}")
 
     todo_log = butler.get_todo_log(todo_id)
-    logger.debug(f"Fetched log for todo_id {todo_id}: {todo_log}")
-    if not todo_log:
-        say(f"No TODO found with ID {todo_id}.")
-        return
-    # 1. Prepare the log string first
-    log_string = "\n".join(todo_log)
-
-    # 2. Now the f-string is simple and readable
+    log_string = format_todo_logs(todo_log)
+    logger.debug(f"Fetched log for todo_id {todo_id}:\n{log_string}")
     say(f"""TODO log for ID {todo_id}:\n{log_string}""")
 
 
@@ -222,7 +212,7 @@ def test_send(ctx: typer.Context):
     say = ctx.obj.say
     logger.info(f"Creating test Block Kit message...")
 
-    blocks = butler._build_single_todo_accessory_blocks(
+    blocks = BlockBuilder.build_single_todo_blocks(
         {
             "user_id": "foo",
             "todo_id": 9999,

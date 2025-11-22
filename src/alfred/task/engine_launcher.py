@@ -3,14 +3,14 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor
 
-from . import task_engine
+from .task_engine import run_scheduler
 
 logger = logging.getLogger(__name__)
 
 def task_engine_job():
     try:
         current_time = datetime.now()
-        task_engine.instance.run_scheduler(current_time)
+        run_scheduler(current_time)
     except Exception as e:
         logger.exception(f"Error in task engine job: {e}")
 

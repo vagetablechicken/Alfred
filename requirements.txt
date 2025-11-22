@@ -1,8 +1,0 @@
-slack_bolt
-aiohttp
-flask
-croniter
-apscheduler
-pytest
-pyyaml
-typer[all]

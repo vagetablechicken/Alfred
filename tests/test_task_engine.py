@@ -15,17 +15,17 @@ class DummyCron:
 
 
 @pytest.fixture
-def mock_engine(monkeypatch):
-    # monkeypatch the imported 'croniter' in task engine to use DummyCron
+def mock_croniter(monkeypatch):
+    # monkeypatch croniter in bulletin module
     def croniter_stub(cron_expr, current_time):
         return DummyCron(current_time)
 
-    monkeypatch.setattr(task_engine, "croniter", croniter_stub)
-    return task_engine.instance
+    from alfred.task import bulletin
+    monkeypatch.setattr(bulletin, "croniter", croniter_stub)
+    return croniter_stub
 
 
-def test_add_template_and_revoke(mock_engine):
-    engine = mock_engine
+def test_add_template_and_revoke(mock_croniter):
     bulletin = Bulletin()
     # Add a new template
     template_id = bulletin.add_template(
@@ -42,7 +42,7 @@ def test_add_template_and_revoke(mock_engine):
     assert len(templates) == 1
     assert templates[0]["template_id"] == template_id
 
-    engine.run_scheduler(current_time="2025-11-08T11:00:00")
+    task_engine.run_scheduler(current_time="2025-11-08T11:00:00")
 
     # Revoke todos by deactivating the template
     bulletin.set_template_active_status(
