@@ -176,11 +176,11 @@ def add_template(
     run_once: int = typer.Argument(0, help="1 = run once, 0 = periodic (default: 0)"),
 ):
     """
-    Add a task template.
+    Add a todo template.
     """
     template_id = butler.add_template(
         user_id=user_id,
-        todo_content=content,
+        content=content,
         cron=cron,
         offset=offset,
         run_once=run_once,
@@ -260,7 +260,7 @@ def test_send(ctx: typer.Context):
         {
             "user_id": "foo",
             "todo_id": 9999,
-            "todo_content": "Test Task",
+            "content": "Test Task",
             "status": "pending",
             "remind_time": datetime.strptime(
                 "2020-01-01 00:00:00", "%Y-%m-%d %H:%M:%S"

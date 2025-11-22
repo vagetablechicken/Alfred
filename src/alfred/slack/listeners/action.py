@@ -109,8 +109,8 @@ def handle_cron_submission(ack, body, view, logger, client):
     # 提取 User ID (注意字段名是 selected_user)
     target_user_id = state_values["block_user"]["action_user"]["selected_user"]
 
-    # 提取 Name
-    task_name = state_values["block_name"]["action_name"]["value"]
+    # 提取 Content
+    content = state_values["block_content"]["action_content"]["value"]
 
     # 提取 Cron
     cron_exp = state_values["block_cron"]["action_cron"]["value"]
@@ -140,13 +140,13 @@ def handle_cron_submission(ack, body, view, logger, client):
     ack()
 
     logger.info(
-        f"Added new cron template: User={target_user_id}, Name={task_name}, "
+        f"Added new cron template: User={target_user_id}, Content={content}, "
         f"Cron={cron_exp}, Offset={offset_val}, RunOnce={run_once_val}"
     )
     try:
         template_id = butler.add_template(
             user_id=target_user_id,
-            todo_content=task_name,
+            content=content,
             cron=cron_exp,
             offset=offset_val,
             run_once=int(run_once_val),
@@ -155,7 +155,7 @@ def handle_cron_submission(ack, body, view, logger, client):
         client.chat_postMessage(
             channel=body["user"]["id"],
             text=(
-                f"✅ 已为 <@{target_user_id}> 添加定时任务模板 *{task_name}*，"
+                f"✅ 已为 <@{target_user_id}> 添加定时任务模板 *{content}*，"
                 f"模板ID: {template_id}。"
             ),
         )

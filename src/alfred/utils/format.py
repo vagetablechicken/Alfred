@@ -13,7 +13,7 @@ def format_templates(templates):
         return "_No templates found._"
     template_lines = []
     for template in templates:
-        line = f"- [ID: {template['template_id']}] {template['todo_content']} (Cron: {template['cron']}, Active: {template['is_active']})"
+        line = f"- [ID: {template['template_id']}] {template['content']} (Cron: {template['cron']}, Active: {template['is_active']})"
         template_lines.append(line)
     return "\n".join(template_lines)
 
@@ -47,16 +47,16 @@ def build_add_template_view(view: str):
                 },
                 "label": {"type": "plain_text", "text": "目标用户 (User)"},
             },
-            # 2. Name
+            # 2. Content
             {
                 "type": "input",
-                "block_id": "block_name",
+                "block_id": "block_content",
                 "element": {
                     "type": "plain_text_input",
-                    "action_id": "action_name",
+                    "action_id": "action_content",
                     "placeholder": {"type": "plain_text", "text": "例如: Review提醒"},
                 },
-                "label": {"type": "plain_text", "text": "任务名称 (Name)"},
+                "label": {"type": "plain_text", "text": "任务内容 (Content)"},
             },
             # 3. Cron 表达式
             {
@@ -83,7 +83,7 @@ def build_add_template_view(view: str):
                     "action_id": "action_offset",
                     "placeholder": {"type": "plain_text", "text": "例如: 1h"},
                 },
-                "label": {"type": "plain_text", "text": "提醒间隔/偏移 (Offset)"},
+                "label": {"type": "plain_text", "text": "逾期偏移 (Offset)"},
                 "hint": {"type": "plain_text", "text": "例如: 1h, 30m"},
             },
             # 5. Run Once (单选按钮，默认选0)

@@ -4,22 +4,6 @@
 
 Alfred 使用 YAML 配置文件管理环境配置。
 
-### config.yaml (生产环境)
-```yaml
-database:
-  path: "tasks.db"  # 数据库文件路径
-logging:
-  level: "INFO"
-```
-
-### config.test.yaml (测试环境)
-```yaml
-database:
-  path: "test.db"  # 测试数据库文件路径
-logging:
-  level: "DEBUG"
-```
-
 ## 自动配置选择
 
 **pytest 运行时自动使用测试配置:**
@@ -68,17 +52,8 @@ config = load_config()
 - **类型**: string
 - **说明**: 数据库文件路径
 - **值**:
-  - 相对路径（如 `"tasks.db"`）：相对于运行目录
-  - 绝对路径（如 `"C:/data/tasks.db"`）
-  - 不建议使用`:memory:`，大部分的测试都是临时创建connection。
-
-### vault.init_sql
-- **类型**: string
-- **说明**: 初始化数据库的 SQL 脚本路径
-- **默认**: 代码内置默认脚本
-- **值**:
-  - 相对路径（如 `"init.sql"`）：相对于运行目录
-  - 绝对路径（如 `"/path/to/init.sql"`）
+  - SQLite: `"sqlite:///path/to/db.sqlite3"`
+  - PostgreSQL: `"postgresql+psycopg://user:password@host:port/dbname"`
 
 ### logging.level
 - **类型**: string

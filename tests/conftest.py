@@ -5,6 +5,8 @@ import os
 from unittest.mock import MagicMock
 import pytest
 
+from alfred.task.vault.models import Base
+
 
 def pytest_configure(config):
     """Configure pytest and setup mocks based on marker expression"""
@@ -47,20 +49,12 @@ def test_vault():
     Fixture to provide a clean vault for each test.
     """
     from alfred.task.vault import get_vault
-    from alfred.task.vault.models import TodoStatusLog, Todo, TodoTemplate
 
     vault = get_vault()
-    with vault.db as session:
-        # Delete in order: logs -> todos -> templates (respect foreign keys)
-        session.query(TodoStatusLog).delete()
-        session.query(Todo).delete()
-        session.query(TodoTemplate).delete()
+    Base.metadata.drop_all(vault.engine)
 
-    # Verify all tables are empty
-    with vault.db as session:
-        assert session.query(TodoStatusLog).count() == 0
-        assert session.query(Todo).count() == 0
-        assert session.query(TodoTemplate).count() == 0
+    # Recreate schema
+    Base.metadata.create_all(vault.engine)
 
     # it's ok to use get_vault() inside tests
     yield vault

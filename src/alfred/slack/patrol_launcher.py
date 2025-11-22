@@ -11,17 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 def patrol_job():
-    # read from engine, if tasks are due, send reminders
+    # read from engine, if todos are due, send reminders
     with butler.gather_notify_blocks() as blocks:
         if blocks:
-            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Task Reminder")
+            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Todo Reminder")
             if not res["ok"]:
                 raise Exception(f"Slack API error: {res}")
 
     # if end of day, send summary
     with butler.gather_end_of_day_summary() as blocks:
         if blocks:
-            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Daily Task Summary")
+            res = app.client.chat_postMessage(channel=get_slack_channel(), blocks=blocks, text="Daily Todo Summary")
             if not res["ok"]:
                 raise Exception(f"Slack API error: {res}")
 

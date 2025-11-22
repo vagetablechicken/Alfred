@@ -38,8 +38,8 @@ class TodoTemplate(Base):
     # 对应: template_id INTEGER PRIMARY KEY AUTOINCREMENT
     id: Mapped[int] = mapped_column("template_id", primary_key=True)
 
-    # 对应: todo_content TEXT NOT NULL
-    content: Mapped[str] = mapped_column("todo_content", Text, nullable=False)
+    # 对应: content TEXT NOT NULL
+    content: Mapped[str] = mapped_column("content", Text, nullable=False)
 
     # 对应: user_id TEXT NOT NULL (给 String 加长度是为了兼容 Postgres)
     user_id: Mapped[str] = mapped_column(String(100), nullable=False)

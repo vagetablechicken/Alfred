@@ -18,7 +18,7 @@ def test_butler_send_slack_with_bulletin_todos(monkeypatch):
             "todo_id": 1,
             "status": "pending",
             "user_id": 123,
-            "todo_content": "Complete the report",
+            "content": "Complete the report",
         },
         {
             "remind_time": (current_time - timedelta(hours=1)).isoformat(),
@@ -26,7 +26,7 @@ def test_butler_send_slack_with_bulletin_todos(monkeypatch):
             "todo_id": 2,
             "status": "finished",
             "user_id": 123,
-            "todo_content": "Attend the meeting",
+            "content": "Attend the meeting",
         },
         {
             "remind_time": (current_time - timedelta(hours=2)).isoformat(),
@@ -34,7 +34,7 @@ def test_butler_send_slack_with_bulletin_todos(monkeypatch):
             "todo_id": 3,
             "status": "pending",
             "user_id": 123,
-            "todo_content": "Submit the assignment",
+            "content": "Submit the assignment",
         },
         {
             "remind_time": (current_time + timedelta(hours=1)).isoformat(),
@@ -42,7 +42,7 @@ def test_butler_send_slack_with_bulletin_todos(monkeypatch):
             "todo_id": 4,
             "status": "pending",
             "user_id": 123,
-            "todo_content": "Prepare for the presentation",
+            "content": "Prepare for the presentation",
         },
     ]
     mock_bulletin.get_todos.return_value = mock_todos

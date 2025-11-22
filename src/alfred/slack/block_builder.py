@@ -74,7 +74,7 @@ class StandardBlockStyle(BlockStyle):
     def build_single_todo_blocks(self, todo, is_overdue=False):
         todo_id = todo.get("todo_id")
         user_id = todo.get("user_id")
-        todo_content = todo.get("todo_content")
+        content = todo.get("content")
         status = todo.get("status")
 
         section_block_id = f"todo_section_{todo_id}"
@@ -105,9 +105,9 @@ class StandardBlockStyle(BlockStyle):
         status_display = status_emoji_map.get(status, status)
 
         if status in ("completed", "revoked"):
-            text_content_display = f"~{todo_content}~"
+            text_content_display = f"~{content}~"
         else:
-            text_content_display = f"*{todo_content}*"
+            text_content_display = f"*{content}*"
 
         metadata_display = (
             f"> *By*: <@{user_id}> | *ID*: {todo_id} | *Status*: {status_display}"
@@ -198,7 +198,7 @@ class SaaSBlockStyle(BlockStyle):
     def build_single_todo_blocks(self, todo, is_overdue=False):
         todo_id = todo.get("todo_id")
         user_id = todo.get("user_id")
-        todo_content = todo.get("todo_content")
+        content = todo.get("content")
         status = todo.get("status")
         due_time = todo.get("due_time", "No Date")
 
@@ -208,10 +208,10 @@ class SaaSBlockStyle(BlockStyle):
             status_badge = "` PENDING ` "
 
         if status == "completed":
-            content_display = f"~{todo_content}~"
+            content_display = f"~{content}~"
             status_badge = "` DONE ` "
         else:
-            content_display = f"{todo_content}"
+            content_display = f"{content}"
 
         if status == "pending":
             btn_text = "Done"
@@ -263,7 +263,7 @@ class SaaSBlockStyle(BlockStyle):
         total = len(todos_today)
         blocks.append({
             "type": "context",
-            "elements": [{"type": "mrkdwn", "text": f"Total tasks: {total}"}]
+            "elements": [{"type": "mrkdwn", "text": f"Total todos: {total}"}]
         })
         return blocks
 
@@ -332,7 +332,7 @@ class GitFlowBlockStyle(BlockStyle):
     def build_single_todo_blocks(self, todo, is_overdue=False):
         todo_id = todo.get("todo_id")
         user_id = todo.get("user_id")
-        todo_content = todo.get("todo_content")
+        content = todo.get("content")
         status = todo.get("status")
         due_time = todo.get("remind_time")
 
@@ -361,7 +361,7 @@ class GitFlowBlockStyle(BlockStyle):
             time_display = f"{due_time.strftime('%Y-%m-%d %H:%M:%S')}"
 
         text_block = (
-            f"> {id_badge}  <@{user_id}>  `::`  *{todo_content}*\n"
+            f"> {id_badge}  <@{user_id}>  `::`  *{content}*\n"
             f"> ` └── `{time_display}"
         )
     
@@ -396,7 +396,7 @@ class GitFlowBlockStyle(BlockStyle):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"Summary complete: {total} tasks reviewed.",
+                        "text": f"Summary complete: {total} todos reviewed.",
                     }
                 ],
             }

@@ -20,11 +20,11 @@ class Butler:
 
     @contextmanager
     def gather_notify_blocks(self):
-        """gather today pending tasks as Slack blocks"""
+        """gather today pending todos as Slack blocks"""
         current_time = datetime.now()
         todos_today = self.bulletin.get_todos(current_time.date())
 
-        # filter pending tasks, some todos have already been reminded, skip those
+        # filter pending todos, some todos have already been reminded, skip those
         def need_normal_remind(todo):
             # todo times are str
             remind_time = datetime.fromisoformat(todo["remind_time"])
@@ -111,11 +111,11 @@ class Butler:
         return new_blocks
 
     def mark_todo_complete(self, todo_id: int):
-        """mark a task as completed"""
+        """mark a todo as completed"""
         self.bulletin.complete_todo(todo_id, datetime.now())
 
     def mark_todo_undo(self, todo_id: int):
-        """undo a task completion"""
+        """undo a todo completion"""
         self.bulletin.revert_todo_completion(todo_id, datetime.now())
 
     def __getattr__(self, name):

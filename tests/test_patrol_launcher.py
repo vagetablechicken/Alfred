@@ -74,9 +74,9 @@ def test_patrol_job_sends_both_and_ok(monkeypatch):
     assert len(calls) == 2
     assert calls[0]["channel"] == "C321"
     assert calls[0]["blocks"] == ["notify_block"]
-    assert calls[0]["text"] == "Task Reminder"
+    assert calls[0]["text"] == "Todo Reminder"
     assert calls[1]["blocks"] == ["summary_block"]
-    assert calls[1]["text"] == "Daily Task Summary"
+    assert calls[1]["text"] == "Daily Todo Summary"
 
 
 def test_patrol_job_raises_on_slack_error_on_notify(monkeypatch):

@@ -9,7 +9,7 @@ def sample_todos():
         {
             "todo_id": 101,
             "user_id": "U12345",
-            "todo_content": "Fix critical bug in production",
+            "content": "Fix critical bug in production",
             "status": "pending",
             "remind_time": datetime.strptime("2023-10-27 12:00:00", "%Y-%m-%d %H:%M:%S") ,
             "ddl_time": datetime.strptime("2023-10-27 12:01:00", "%Y-%m-%d %H:%M:%S")
@@ -17,7 +17,7 @@ def sample_todos():
         {
             "todo_id": 102,
             "user_id": "U67890",
-            "todo_content": "Update API documentation",
+            "content": "Update API documentation",
             "status": "completed",
             "remind_time": datetime.strptime("2023-10-28 18:00:00", "%Y-%m-%d %H:%M:%S"),
             "ddl_time": datetime.strptime("2023-10-28 18:05:00", "%Y-%m-%d %H:%M:%S")

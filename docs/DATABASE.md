@@ -32,7 +32,7 @@ CREATE DATABASE alfred_test OWNER alfred;
 | 字段名 | 类型 | 说明 | 约束 |
 |--------|------|------|------|
 | template_id | INTEGER | 模板ID | PRIMARY KEY, AUTO_INCREMENT |
-| todo_content | TEXT | 任务内容 | NOT NULL |
+| content | TEXT | 任务内容 | NOT NULL |
 | user_id | VARCHAR(100) | 用户ID | NOT NULL |
 | cron | VARCHAR(100) | Cron表达式 | NOT NULL |
 | ddl_offset | VARCHAR(50) | 截止时间偏移量（如 "1h", "2d"） | NOT NULL |

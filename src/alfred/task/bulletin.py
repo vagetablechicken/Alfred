@@ -132,7 +132,7 @@ class Bulletin:
             self.logger.error(f"ERROR completing Todo {todo_id}: {e}")
 
     def revert_todo_completion(self, todo_id: int, current_time: datetime | str):
-        """user reverts a completed task back to pending/escalated"""
+        """user reverts a completed todo back to pending/escalated"""
         if isinstance(current_time, str):
             current_time = datetime.fromisoformat(current_time)
         self.logger.info(f"--- [USER] Reverting Todo {todo_id} at {current_time} ---")
@@ -188,9 +188,9 @@ class Bulletin:
 
                 template.is_active = bool(is_active)
 
-                tasks_to_revoke: List[Todo] = []
+                todos_to_revoke: List[Todo] = []
                 if not is_active:
-                    tasks_to_revoke = (
+                    todos_to_revoke = (
                         session.execute(
                             select(Todo).where(
                                 Todo.template_id == template_id,
@@ -203,10 +203,10 @@ class Bulletin:
                         .all()
                     )
 
-                    if not tasks_to_revoke:
+                    if not todos_to_revoke:
                         self.logger.info("No active todos to revoke.")
 
-                    for todo in tasks_to_revoke:
+                    for todo in todos_to_revoke:
                         old_status = todo.status
                         self.logger.info(
                             f"REVOKING Todo {todo.id} (was {old_status.value})..."
@@ -225,9 +225,9 @@ class Bulletin:
                 self.logger.info(
                     f"Successfully set Template {template_id} active status to {is_active}"
                 )
-                if not is_active and tasks_to_revoke:
+                if not is_active and todos_to_revoke:
                     self.logger.info(
-                        f"Revoked {len(tasks_to_revoke)} associated tasks."
+                        f"Revoked {len(todos_to_revoke)} associated todos."
                     )
         except Exception as e:
             self.logger.error(f"ERROR changing template status: {e}")
@@ -267,7 +267,7 @@ class Bulletin:
                 {
                     "template_id": t.id,
                     "user_id": t.user_id,
-                    "todo_content": t.content,
+                    "content": t.content,
                     "cron": t.cron,
                     "ddl_offset": t.ddl_offset,
                     "is_active": t.is_active,
@@ -321,7 +321,7 @@ class Bulletin:
                 {
                     "template_id": t.id,
                     "user_id": t.user_id,
-                    "todo_content": t.content,
+                    "content": t.content,
                     "cron": t.cron,
                     "ddl_offset": t.ddl_offset,
                     "is_active": t.is_active,
@@ -420,7 +420,7 @@ class Bulletin:
             template_id = template.id
             cron = template.cron
             ddl_offset = template.ddl_offset
-            todo_content = template.content
+            content = template.content
             run_once = template.run_once
 
             # Use croniter to find the last due time before current_time
@@ -432,7 +432,7 @@ class Bulletin:
                 return {"created": False, "reason": "already_exists"}
 
             self.logger.info(
-                f"[Scheduler] CREATING: Task for {user_id} ({todo_content}) at {last_due_time}"
+                f"[Scheduler] CREATING: Task for {user_id} ({content}) at {last_due_time}"
             )
 
             todo_id = self.create_todo(
@@ -491,7 +491,7 @@ class Bulletin:
                     {
                         "todo_id": td.id,
                         "template_id": tpl.id,
-                        "todo_content": tpl.content,
+                        "content": tpl.content,
                         "user_id": td.user_id,
                         "status": td.status.value,
                         "remind_time": td.remind_time,
@@ -510,7 +510,7 @@ class Bulletin:
                     {
                         "todo_id": td.id,
                         "template_id": tpl.id,
-                        "todo_content": tpl.content,
+                        "content": tpl.content,
                         "user_id": td.user_id,
                         "remind_time": td.remind_time,
                         "ddl_time": td.ddl_time,
@@ -536,7 +536,7 @@ class Bulletin:
             td, tpl = row
             return {
                 "todo_id": td.id,
-                "todo_content": tpl.content,
+                "content": tpl.content,
                 "user_id": td.user_id,
                 "remind_time": td.remind_time,
                 "ddl_time": td.ddl_time,

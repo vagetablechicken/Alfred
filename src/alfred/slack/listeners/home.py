@@ -44,7 +44,7 @@ def generate_home_view(today, user_name):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*I'm your team task assistant.*\n\nYou can create a new task template using the button below, or use `/alfred ` commands in messages.",
+                    "text": "*I'm your team todo assistant.*\n\nYou can create a new todo template using the button below, or use `/alfred ` commands in messages.",
                 },
             },
             {
