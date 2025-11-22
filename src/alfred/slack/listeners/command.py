@@ -7,7 +7,12 @@ import shlex
 
 from alfred.slack.block_builder import BlockBuilder
 from alfred.utils.config import get_slack_admin
-from alfred.utils.format import build_add_template_view, format_templates, format_todo_logs, format_todos
+from alfred.utils.format import (
+    build_add_template_view,
+    format_templates,
+    format_todo_logs,
+    format_todos,
+)
 
 from alfred.slack.app import app
 from alfred.slack.butler import butler
@@ -45,14 +50,19 @@ def handle_alfred_command(ack, body, client, logger, say):
     try:
         args_list = shlex.split(text)
         logger.debug(f"Parsed args: {args_list}")
+
         # bind logger and say to AppState for Typer commands
         class AppState:
             def __init__(self, logger, say_ephemeral, say):
                 self.logger = logger
                 self.say_ephemeral = say_ephemeral
                 self.say = say
+                self.client = client
                 self.trigger_id = body.get("trigger_id")
-        alfred_cli_app(args_list, obj=AppState(logger, say_ephemeral, say), standalone_mode=False)
+
+        alfred_cli_app(
+            args_list, obj=AppState(logger, say_ephemeral, say), standalone_mode=False
+        )
     except typer.BadParameter as e:
         # Typer validation error
         logger.exception(f"Typer parameter error: {e}")
@@ -113,7 +123,7 @@ class ListCategory(str, enum.Enum):
 def help_string():
     return (
         "*Alfred Bot Command Help:*\n"
-        "• `/alfred add template <user_id> <name> <cron> <offset> [<run_once>]`\n"
+        "• `/alfred add template <user_id> <content> <cron> <offset> [<run_once>]`\n"
         "  run_once is optional, 1 = run once then disable, 0 = run periodically, default is 0\n"
         "  (Example: `/alfred add template 'U0xxx' 'Review' '0 9 * * 1-5' '1h' '1'`)\n"
         "• `/alfred list [todos|templates]`\n"
@@ -136,6 +146,7 @@ alfred_cli_app = typer.Typer(
 add_app = typer.Typer(help="Add (e.g., 'template')")
 alfred_cli_app.add_typer(add_app, name="add")
 
+
 # add will create interactive modal
 @add_app.callback(invoke_without_command=True)
 def add_main(ctx: typer.Context):
@@ -151,12 +162,12 @@ def add_main(ctx: typer.Context):
 # add template command for developer
 @add_app.command(
     "template",
-    help="• /alfred add template <user_id> <name> <cron> <offset> [<run_once>]",
+    help="• /alfred add template <user_id> <content> <cron> <offset> [<run_once>]",
 )
 def add_template(
     ctx: typer.Context,
     user_id: str = typer.Argument(..., help="User ID (e.g., 'U0xxx')"),
-    name: str = typer.Argument(..., help="Template name (e.g., 'Review')"),
+    content: str = typer.Argument(..., help="Template content (e.g., 'Review')"),
     cron: str = typer.Argument(..., callback=validate_cron, help="Cron expression"),
     offset: str = typer.Argument(
         ..., callback=validate_duration, help="Reminder interval/offset (e.g., '1h')"
@@ -167,7 +178,13 @@ def add_template(
     """
     Add a task template.
     """
-    template_id = butler.add_template(user_id, name, cron, offset, run_once)
+    template_id = butler.add_template(
+        user_id=user_id,
+        todo_content=content,
+        cron=cron,
+        offset=offset,
+        run_once=run_once,
+    )
     ctx.obj.logger.info(
         f"User <@{user_id}> added template {template_id} for <@{user_id}>"
     )

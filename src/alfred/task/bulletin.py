@@ -232,16 +232,16 @@ class Bulletin:
         except Exception as e:
             self.logger.error(f"ERROR changing template status: {e}")
 
-    def add_template(self, user_id, todo_content, cron, ddl_offset, run_once=0):
+    def add_template(self, user_id, content, cron, ddl_offset, run_once=0):
         """
         Add a new task template for a todo.
         Returns the template_id of the newly created template.
         """
-        self.logger.info(f"Adding template for {user_id}: {todo_content}")
+        self.logger.info(f"Adding template for {user_id}: {content}")
         with self.vault.session_scope() as session:
             template = TodoTemplate(
                 user_id=user_id,
-                content=todo_content,
+                content=content,
                 cron=cron,
                 ddl_offset=ddl_offset,
                 run_once=bool(run_once),

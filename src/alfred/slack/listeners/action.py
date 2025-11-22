@@ -146,7 +146,7 @@ def handle_cron_submission(ack, body, view, logger, client):
     try:
         template_id = butler.add_template(
             user_id=target_user_id,
-            name=task_name,
+            todo_content=task_name,
             cron=cron_exp,
             offset=offset_val,
             run_once=int(run_once_val),

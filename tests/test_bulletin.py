@@ -11,7 +11,7 @@ def test_complete_todo_records_status_and_log():
 	# create a template to satisfy foreign key
 	template_id = bulletin.add_template(
 		user_id="U_TEST",
-		todo_content="Complete me",
+		content="Complete me",
 		cron="* * * * *",
 		ddl_offset="1h",
 		run_once=0,
@@ -55,7 +55,7 @@ def test_revert_todo_completion_sets_pending_and_logs():
 
 	template_id = bulletin.add_template(
 		user_id="U_TEST2",
-		todo_content="Revert me",
+		content="Revert me",
 		cron="* * * * *",
 		ddl_offset="1h",
 		run_once=0,
@@ -106,7 +106,7 @@ def test_get_todos_with_date_filter():
 	# create a template
 	template_id = bulletin.add_template(
 		user_id="U_TEST3",
-		todo_content="Date filter test",
+		content="Date filter test",
 		cron="* * * * *",
 		ddl_offset="1h",
 		run_once=0,

@@ -9,7 +9,7 @@ def test_task_runs_in_background_and_completes():
     # add a template
     template_id = bulletin.add_template(
         user_id="U_TEST",
-        todo_content="Test Task",
+        content="Test Task",
         cron="*/1 * * * *",  # every minute
         ddl_offset="5s",
         run_once=0,

@@ -30,7 +30,7 @@ def test_add_template_and_revoke(mock_croniter):
     # Add a new template
     template_id = bulletin.add_template(
         user_id="Charlie",
-        todo_content="Task C",
+        content="Task C",
         cron="* * * * *",
         ddl_offset="10m",
         run_once=0,
