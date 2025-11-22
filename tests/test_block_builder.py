@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import pytest
 from alfred.slack.block_builder import BlockBuilder
@@ -10,18 +11,16 @@ def sample_todos():
             "user_id": "U12345",
             "todo_content": "Fix critical bug in production",
             "status": "pending",
-            "remind_time": "10:00",
-            "due_time": "2023-10-27 12:00",
-            "ddl_time": "2023-10-27 12:00"
+            "remind_time": datetime.strptime("2023-10-27 12:00:00", "%Y-%m-%d %H:%M:%S") ,
+            "ddl_time": datetime.strptime("2023-10-27 12:01:00", "%Y-%m-%d %H:%M:%S")
         },
         {
             "todo_id": 102,
             "user_id": "U67890",
             "todo_content": "Update API documentation",
             "status": "completed",
-            "remind_time": "14:00",
-            "due_time": "2023-10-28 18:00",
-            "ddl_time": "2023-10-28 18:00"
+            "remind_time": datetime.strptime("2023-10-28 18:00:00", "%Y-%m-%d %H:%M:%S"),
+            "ddl_time": datetime.strptime("2023-10-28 18:05:00", "%Y-%m-%d %H:%M:%S")
         }
     ]
 

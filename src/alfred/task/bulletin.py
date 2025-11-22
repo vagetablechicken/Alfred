@@ -3,7 +3,7 @@ import logging
 from typing import List
 from croniter import croniter
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, Date
 
 from alfred.task.vault import get_vault
 from alfred.task.vault.models import (
@@ -477,14 +477,14 @@ class Bulletin:
     def get_todos(self, query_date: date | str = None):
         """get todos for a specific date (YYYY-MM-DD) or all if None"""
         if query_date and isinstance(query_date, str):
-            query_date = date.fromisoformat(query_date).date()
+            query_date = date.fromisoformat(query_date)
         self.logger.info(f"[QUERY] Getting todos for reminder date: {query_date}")
         with self.vault.session_scope() as session:
             if query_date:
                 rows = session.execute(
                     select(Todo, TodoTemplate)
                     .join(TodoTemplate, Todo.template_id == TodoTemplate.id)
-                    .where(func.date(Todo.remind_time) == query_date.isoformat())
+                    .where(func.cast(Todo.remind_time, Date) == query_date)
                     .order_by(Todo.remind_time)
                 ).all()
                 result = [

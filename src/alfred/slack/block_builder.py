@@ -356,9 +356,9 @@ class GitFlowBlockStyle(BlockStyle):
         id_badge = f"` #{todo_id} `"
 
         if is_overdue:
-            time_display = f"*{due_time}*"
+            time_display = f"*{due_time.strftime('%Y-%m-%d %H:%M:%S')}*"
         else:
-            time_display = f"{due_time}"
+            time_display = f"{due_time.strftime('%Y-%m-%d %H:%M:%S')}"
 
         text_block = (
             f"> {id_badge}  <@{user_id}>  `::`  *{todo_content}*\n"

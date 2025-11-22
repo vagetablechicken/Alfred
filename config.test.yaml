@@ -1,6 +1,6 @@
 # Alfred 测试环境配置
 vault:
-  path: "postgresql://alfred:alfred@localhost:5432/alfred_test"
+  path: "postgresql+psycopg://alfred:alfred@localhost:5432/alfred_test"
   # path: "sqlite://./test.db"
 
 logging:

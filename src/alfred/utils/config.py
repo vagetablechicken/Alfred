@@ -58,7 +58,7 @@ def get_vault_path(config_file: str = None) -> str:
     if not db_path:
         raise ValueError("Vault database path not configured.")
     # validate path, only support sqlite and postgresql for now
-    if not (db_path.startswith("sqlite://") or db_path.startswith("postgresql://")):
+    if not (db_path.startswith("sqlite://") or db_path.startswith("postgresql+psycopg://")):
         raise ValueError("Unsupported vault database path. Only sqlite and postgresql are supported.")
 
     return db_path

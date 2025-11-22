@@ -97,3 +97,59 @@ def test_revert_todo_completion_sets_pending_and_logs():
 	logs = bulletin.get_todo_log(todo_id)
 	assert logs[-1]["new_status"] == "pending"
 	assert logs[-1]["old_status"] == "completed"
+
+
+def test_get_todos_with_date_filter():
+	"""Test get_todos with date parameter to verify PostgreSQL compatibility"""
+	bulletin = Bulletin()
+
+	# create a template
+	template_id = bulletin.add_template(
+		user_id="U_TEST3",
+		todo_content="Date filter test",
+		cron="* * * * *",
+		ddl_offset="1h",
+		run_once=0,
+	)
+
+	vault = get_vault()
+	now = datetime.now()
+	today = now.date()
+	tomorrow = today + timedelta(days=1)
+
+	# insert todos for today and tomorrow
+	with vault.session_scope() as session:
+		todo_today = Todo(
+			template_id=template_id,
+			user_id="U_TEST3",
+			remind_time=now,
+			ddl_time=now + timedelta(hours=1),
+			status=TodoStatus.PENDING,
+		)
+		todo_tomorrow = Todo(
+			template_id=template_id,
+			user_id="U_TEST3",
+			remind_time=now + timedelta(days=1),
+			ddl_time=now + timedelta(days=1, hours=1),
+			status=TodoStatus.PENDING,
+		)
+		session.add(todo_today)
+		session.add(todo_tomorrow)
+		session.flush()
+		todo_today_id = todo_today.id
+		todo_tomorrow_id = todo_tomorrow.id
+
+	# test get_todos with date parameter (date object)
+	todos_today = bulletin.get_todos(today)
+	assert len(todos_today) == 1
+	assert todos_today[0]["todo_id"] == todo_today_id
+	assert todos_today[0]["user_id"] == "U_TEST3"
+
+	# test get_todos with date parameter (string)
+	todos_tomorrow = bulletin.get_todos(tomorrow.isoformat())
+	assert len(todos_tomorrow) == 1
+	assert todos_tomorrow[0]["todo_id"] == todo_tomorrow_id
+
+	# test get_todos without date parameter (should get all)
+	todos_all = bulletin.get_todos()
+	assert len(todos_all) == 2

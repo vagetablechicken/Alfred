@@ -76,7 +76,8 @@ class Butler:
             ):
                 self.logger.info("[Butler] Gathering end-of-day summary.")
                 todos_today = self.bulletin.get_todos(current_time.date())
-                blocks = BlockBuilder.build_summary_blocks(todos_today)
+                if todos_today:
+                    blocks = BlockBuilder.build_summary_blocks(todos_today)
             yield blocks
         except Exception as e:
             self.logger.exception(f"[Butler] ERROR sending end-of-day summary: {e}")
