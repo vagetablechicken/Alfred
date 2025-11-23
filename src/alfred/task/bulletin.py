@@ -421,16 +421,16 @@ class Bulletin:
             content = template.content
             run_once = template.run_once
 
-            # Use croniter to find the last due time before current_time
+            # Use croniter to find the next time a todo should be scheduled
             cron_iter = croniter(cron, current_time)
-            last_due_time = cron_iter.get_prev(datetime)
+            next_time = cron_iter.get_next(datetime)
 
             # Check if a todo already exists for this user/template/time
-            if self.check_todo_exists(session, user_id, template_id, last_due_time):
+            if self.check_todo_exists(session, user_id, template_id, next_time):
                 return {"created": False, "reason": "already_exists"}
 
             self.logger.info(
-                f"[Scheduler] CREATING: Task for {user_id} ({content}) at {last_due_time}"
+                f"[Scheduler] CREATING: Task for {user_id} ({content}) at {next_time}"
             )
 
             todo_id = self.create_todo(
@@ -438,7 +438,7 @@ class Bulletin:
                 user_id,
                 template_id,
                 ddl_offset,
-                remind_time=last_due_time,
+                remind_time=next_time,
                 create_time=current_time,
             )
 

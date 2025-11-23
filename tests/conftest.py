@@ -58,3 +58,6 @@ def test_vault():
 
     # it's ok to use get_vault() inside tests
     yield vault
+
+    # delete all tables after test
+    Base.metadata.drop_all(vault.engine)
