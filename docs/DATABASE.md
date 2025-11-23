@@ -8,11 +8,24 @@ Alfred 使用 SQLAlchemy ORM 管理数据库，支持 SQLite（开发/测试）�
 ```bash
 docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:latest
 docker exec -it postgres psql -U postgres
+```
 
-# 创建用户和数据库
+```sql
+-- 创建用户和数据库
 CREATE USER alfred WITH PASSWORD 'alfred';
 CREATE DATABASE alfred OWNER alfred;
 CREATE DATABASE alfred_test OWNER alfred;
+
+-- 清理数据库（建议不要删除，以免丢失数据）
+-- 1. 把现有的 public 模式改名为 backup_xxxx
+ALTER SCHEMA public RENAME TO backup_20251123;
+
+-- 2. 创建一个新的、空的 public 模式 (供新程序使用)
+CREATE SCHEMA public;
+
+-- 3. (关键) 赋予当前用户权限，否则你的程序会报 "permission denied"
+GRANT ALL ON SCHEMA public TO alfred;
+-- GRANT ALL ON SCHEMA public TO public;
 ```
 
 ## 表概览

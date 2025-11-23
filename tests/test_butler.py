@@ -15,7 +15,7 @@ def test_gather_notify_blocks_with_normal_and_overdue():
         content="Test notification",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -76,7 +76,7 @@ def test_gather_notify_blocks_filters_completed_todos():
         content="Completed todo",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -113,7 +113,7 @@ def test_gather_end_of_day_summary():
         content="Summary test",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -157,7 +157,7 @@ def test_gather_end_of_day_summary_before_time():
         content="No summary yet",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -187,7 +187,7 @@ def test_mark_todo_complete():
         content="Complete me",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -222,7 +222,7 @@ def test_mark_todo_undo():
         content="Undo me",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()
@@ -257,7 +257,7 @@ def test_build_single_todo_blocks():
         content="Single todo",
         cron="* * * * *",
         ddl_offset="1h",
-        run_once=0,
+        run_once="0",
     )
     
     vault = get_vault()

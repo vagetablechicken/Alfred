@@ -123,8 +123,10 @@ class ListCategory(str, enum.Enum):
 def help_string():
     return (
         "*Alfred Bot Command Help:*\n"
+        "• `/alfred add`\n"
+        "  (Open interactive modal to add templates)\n"
         "• `/alfred add template <user_id> <content> <cron> <offset> [<run_once>]`\n"
-        "  run_once is optional, 1 = run once then disable, 0 = run periodically, default is 0\n"
+        "  run_once is optional, '1' = run once then disable, '0' = run periodically, default is '0'\n"
         "  (Example: `/alfred add template 'U0xxx' 'Review' '0 9 * * 1-5' '1h' '1'`)\n"
         "• `/alfred list [todos|templates]`\n"
         "  (Default is `todos`)\n"
@@ -154,7 +156,7 @@ def add_main(ctx: typer.Context):
         ctx.obj.logger.info("No subcommand provided for 'add'. Opening modal...")
         ctx.obj.client.views_open(
             trigger_id=ctx.obj.trigger_id,
-            view=build_add_template_view(view="submit_cron_template"),
+            view=build_add_template_view("submit_cron_template"),
         )
     # subcommand will handle the rest if provided
 
@@ -172,8 +174,9 @@ def add_template(
     offset: str = typer.Argument(
         ..., callback=validate_duration, help="Reminder interval/offset (e.g., '1h')"
     ),
-    # optional argument with default
-    run_once: int = typer.Argument(0, help="1 = run once, 0 = periodic (default: 0)"),
+    run_once: str = typer.Argument(
+        "0", help="'1' = run once, '0' = periodic (default: '0')"
+    ),
 ):
     """
     Add a todo template.

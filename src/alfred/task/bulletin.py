@@ -232,7 +232,7 @@ class Bulletin:
         except Exception as e:
             self.logger.error(f"ERROR changing template status: {e}")
 
-    def add_template(self, user_id, content, cron, ddl_offset, run_once=0):
+    def add_template(self, user_id, content, cron, ddl_offset, run_once) -> int:
         """
         Add a new task template for a todo.
         Returns the template_id of the newly created template.
@@ -244,7 +244,7 @@ class Bulletin:
                 content=content,
                 cron=cron,
                 ddl_offset=ddl_offset,
-                run_once=bool(run_once),
+                run_once=bool(int(run_once)),
             )
             session.add(template)
             session.flush()
@@ -284,7 +284,7 @@ class Bulletin:
                     "user_id": td.user_id,
                     "remind_time": td.remind_time,
                     "ddl_time": td.ddl_time,
-                    "status": td.status.value if td.status is not None else None,
+                    "status": td.status.value,
                     "created_at": td.created_at,
                     "updated_at": td.updated_at,
                 }
@@ -298,9 +298,7 @@ class Bulletin:
                     "old_status": (
                         l.old_status.value if l.old_status is not None else None
                     ),
-                    "new_status": (
-                        l.new_status.value if l.new_status is not None else None
-                    ),
+                    "new_status": (l.new_status.value,),
                     "changed_at": l.changed_at,
                 }
                 for l in logs

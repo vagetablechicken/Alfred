@@ -362,7 +362,7 @@ class GitFlowBlockStyle(BlockStyle):
 
         text_block = (
             f"> {id_badge}  <@{user_id}>  `::`  *{content}*\n"
-            f"> ` └── `{time_display}"
+            f"> ` └── ` {time_display}"
         )
     
         section_block = {

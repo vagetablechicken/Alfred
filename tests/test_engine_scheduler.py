@@ -12,7 +12,7 @@ def test_task_runs_in_background_and_completes():
         content="Test Task",
         cron="*/1 * * * *",  # every minute
         ddl_offset="5s",
-        run_once=0,
+        run_once="0",
     )
     assert template_id is not None
 

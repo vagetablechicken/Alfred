@@ -25,7 +25,7 @@ def mock_croniter(monkeypatch):
     return croniter_stub
 
 
-def test_add_template_and_revoke(mock_croniter):
+def test_add_template_and_revoke():
     bulletin = Bulletin()
     # Add a new template
     template_id = bulletin.add_template(
@@ -33,7 +33,7 @@ def test_add_template_and_revoke(mock_croniter):
         content="Task C",
         cron="* * * * *",
         ddl_offset="10m",
-        run_once=0,
+        run_once="0",
     )
     assert template_id is not None
 
