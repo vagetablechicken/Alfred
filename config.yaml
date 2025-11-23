@@ -1,6 +1,6 @@
 # Alfred production environment configuration
 vault:
-  path: "postgres+psycopg://alfred:alfred@localhost:5432/alfred" # Database file path (relative to project root)
+  path: "postgresql+psycopg://alfred:alfred@localhost:5432/alfred" # Database file path (relative to project root)
   # path: "sqlite://./prod.db"
   # init_sql: "" # if not set, use default init sql file
 
