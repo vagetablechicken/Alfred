@@ -128,10 +128,12 @@ def help_string():
         "• `/alfred add template <user_id> <content> <cron> <offset> [<run_once>]`\n"
         "  run_once is optional, '1' = run once then disable, '0' = run periodically, default is '0'\n"
         "  (Example: `/alfred add template 'U0xxx' 'Review' '0 9 * * 1-5' '1h' '1'`)\n"
-        "• `/alfred list [todos|templates]`\n"
-        "  (Default is `todos`)\n"
+        "• `/alfred list [todos|templates] [--limit N]`\n"
+        "  (Default is `todos`, default limit is 20)\n"
         "• `/alfred log <todo_id>`\n"
         "  (Show log for a specific todo ID)\n"
+        "• `/alfred ping`\n"
+        "  (Check if Alfred is online and responsive)\n"
         "• `/alfred test`\n"
         "  (Send a test Block Kit message)\n"
         "• `/alfred help`\n"
@@ -196,7 +198,7 @@ def add_template(
 
 # --- list command ---
 @alfred_cli_app.command(
-    "list", help="• /alfred list [todos|templates] (Default is 'todos')"
+    "list", help="• /alfred list [todos|templates] [--limit N] (Default is 'todos', default limit is 20)"
 )
 def list_items(
     ctx: typer.Context,
@@ -205,25 +207,40 @@ def list_items(
         case_sensitive=False,
         help="Type of items to list (todos or templates)",
     ),
+    limit: int = typer.Option(
+        20, "--limit", "-n", help="Maximum number of most-recent items to return (0 = no limit)"
+    ),
 ):
     """
     List todos or templates.
     """
     logger = ctx.obj.logger
     say_ephemeral = ctx.obj.say_ephemeral
-    logger.info(f"Category: {category.value}")  # 'todos' or 'templates'
+    logger.info(f"Category: {category.value}, limit: {limit}")
+
+    effective_limit = limit if limit > 0 else None
 
     if category == ListCategory.todos:
         logger.info("Fetching all active todos...")
         # admin may want to see all todos
-        todos = butler.get_todos()
-        todo_list = format_todos(todos)
+        todos = butler.get_todos(limit=effective_limit)
+        if effective_limit is not None and len(todos) > effective_limit:
+            todos = todos[:effective_limit]
+            has_more = True
+        else:
+            has_more = False
+        todo_list = format_todos(todos, has_more=has_more)
         logger.debug(f"Listing todos: {todo_list}")
         say_ephemeral(f"*TODOs:*\n{todo_list}")
     elif category == ListCategory.templates:
         logger.info("Fetching all templates...")
-        templates = butler.get_templates()
-        template_list = format_templates(templates)
+        templates = butler.get_templates(limit=effective_limit)
+        if effective_limit is not None and len(templates) > effective_limit:
+            templates = templates[:effective_limit]
+            has_more = True
+        else:
+            has_more = False
+        template_list = format_templates(templates, has_more=has_more)
         logger.debug(f"Listing templates: {template_list}")
         say_ephemeral(f"*Task Templates:*\n{template_list}")
 
@@ -247,6 +264,22 @@ def log_todo(
     log_string = format_todo_logs(todo_log)
     logger.debug(f"Fetched log for todo_id {todo_id}:\n{log_string}")
     say_ephemeral(f"""TODO log for ID {todo_id}:\n{log_string}""")
+
+
+@alfred_cli_app.command("ping", help="Check if Alfred is online and responsive")
+def ping(ctx: typer.Context):
+    """
+    Check if Alfred is online and measure response time.
+    """
+    logger = ctx.obj.logger
+    say_ephemeral = ctx.obj.say_ephemeral
+    logger.info("Ping command received.")
+    now = datetime.now()
+    say_ephemeral(
+        f"🟢 *Alfred is online!*\n"
+        f"> Server time: `{now.strftime('%Y-%m-%d %H:%M:%S')}`\n"
+        f"> If you see this message, Alfred is reachable and responding normally."
+    )
 
 
 @alfred_cli_app.command("test", help="Send a test Block Kit message")

@@ -306,15 +306,20 @@ class Bulletin:
 
         return all_data
 
-    def get_templates(self):
-        """get all todo templates"""
-        self.logger.info(f"[QUERY] Getting all todo templates")
+    def get_templates(self, limit: int = None):
+        """get all todo templates, optionally limited to the most recent N entries.
+
+        Args:
+            limit: If provided, returns at most `limit` most-recent templates.
+                   Internally fetches `limit + 1` rows so the caller can detect
+                   whether more records exist beyond the requested page.
+        """
+        self.logger.info(f"[QUERY] Getting all todo templates (limit={limit})")
         with self.vault.session_scope() as session:
-            templates = (
-                session.execute(select(TodoTemplate).order_by(TodoTemplate.id))
-                .scalars()
-                .all()
-            )
+            stmt = select(TodoTemplate).order_by(TodoTemplate.id.desc())
+            if limit is not None:
+                stmt = stmt.limit(limit + 1)
+            templates = session.execute(stmt).scalars().all()
             return [
                 {
                     "template_id": t.id,
@@ -472,19 +477,31 @@ class Bulletin:
             self.logger.error(f"[Scheduler] DB ERROR: {e}")
             raise
 
-    def get_todos(self, query_date: date | str = None):
-        """get todos for a specific date (YYYY-MM-DD) or all if None"""
+    def get_todos(self, query_date: date | str = None, limit: int = None):
+        """get todos for a specific date (YYYY-MM-DD) or all if None.
+
+        Args:
+            query_date: Optional date filter. If None, returns all todos.
+            limit: If provided, returns at most `limit` most-recent todos.
+                   Internally fetches `limit + 1` rows so the caller can detect
+                   whether more records exist beyond the requested page.
+        """
         if query_date and isinstance(query_date, str):
             query_date = date.fromisoformat(query_date)
-        self.logger.info(f"[QUERY] Getting todos for reminder date: {query_date}")
+        self.logger.info(
+            f"[QUERY] Getting todos for reminder date: {query_date} (limit={limit})"
+        )
         with self.vault.session_scope() as session:
             if query_date:
-                rows = session.execute(
+                stmt = (
                     select(Todo, TodoTemplate)
                     .join(TodoTemplate, Todo.template_id == TodoTemplate.id)
                     .where(func.cast(Todo.remind_time, Date) == query_date)
-                    .order_by(Todo.remind_time)
-                ).all()
+                    .order_by(Todo.remind_time.desc())
+                )
+                if limit is not None:
+                    stmt = stmt.limit(limit + 1)
+                rows = session.execute(stmt).all()
                 result = [
                     {
                         "todo_id": td.id,
@@ -499,11 +516,14 @@ class Bulletin:
                 ]
                 return result
             else:
-                rows = session.execute(
+                stmt = (
                     select(Todo, TodoTemplate)
                     .join(TodoTemplate, Todo.template_id == TodoTemplate.id)
-                    .order_by(Todo.remind_time)
-                ).all()
+                    .order_by(Todo.remind_time.desc())
+                )
+                if limit is not None:
+                    stmt = stmt.limit(limit + 1)
+                rows = session.execute(stmt).all()
                 result = [
                     {
                         "todo_id": td.id,

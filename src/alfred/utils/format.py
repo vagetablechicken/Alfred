@@ -1,4 +1,4 @@
-def format_todos(todos):
+def format_todos(todos, has_more: bool = False):
     if not todos:
         return "_No todos found._"
     todo_lines = []
@@ -6,17 +6,23 @@ def format_todos(todos):
         # TODO: user id display
         line = f"- [ID: {todo['todo_id']}] <@{todo['user_id']}> {todo['content']} (Status: {todo['status']}, DDL: {todo['ddl_time']})"
         todo_lines.append(line)
-    return "\n".join(todo_lines)
+    result = "\n".join(todo_lines)
+    if has_more:
+        result += f"\n_More todos exist. Use `/alfred list todos --limit N` to see more._"
+    return result
 
 
-def format_templates(templates):
+def format_templates(templates, has_more: bool = False):
     if not templates:
         return "_No templates found._"
     template_lines = []
     for template in templates:
         line = f"- [ID: {template['template_id']}] <@{template['user_id']}> {template['content']} (Cron: {template['cron']}, Active: {template['is_active']})"
         template_lines.append(line)
-    return "\n".join(template_lines)
+    result = "\n".join(template_lines)
+    if has_more:
+        result += f"\n_More templates exist. Use `/alfred list templates --limit N` to see more._"
+    return result
 
 
 def format_todo_logs(logs):
