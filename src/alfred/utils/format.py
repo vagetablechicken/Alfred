@@ -163,8 +163,9 @@ def build_add_template_view(view_callback_id: str, current_freq: str = "weekdays
     blocks.append({
         "type": "input",
         "block_id": "block_offset",
-        "element": {"type": "plain_text_input", "action_id": "action_offset", "initial_value": "1h"},
-        "label": {"type": "plain_text", "text": "逾期判定 (Offset)"}
+        "element": {"type": "plain_text_input", "action_id": "action_offset", "initial_value": "1h", "placeholder": {"type": "plain_text", "text": "例如: 30m, 1h, 2d"}},
+        "label": {"type": "plain_text", "text": "逾期判定 (Offset)"},
+        "hint": {"type": "plain_text", "text": "格式: 数字+单位，m=分钟，h=小时，d=天，例如: 30m、1h、2d"}
     })
     blocks.append({
         "type": "input",
